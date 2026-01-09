@@ -1,0 +1,24 @@
+{
+  "name": "sawaikars-cashew-store",
+  "version": "1.0.0",
+  "description": "Sawaikar's Cashew Store - Full Stack E-Commerce Application",
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && node server.js",
+    "client": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "seed": "cd backend && node seedData.js"
+  },
+  "keywords": [
+    "ecommerce",
+    "react",
+    "nodejs",
+    "mongodb",
+    "cashew"
+  ],
+  "author": "Sawaikar's Cashew Store",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
