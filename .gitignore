@@ -89,3 +89,4 @@ public/uploads/
 # Local database files
 *.sqlite
 *.db
+.vercel
