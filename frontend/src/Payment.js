@@ -202,6 +202,71 @@ const Payment = () => {
     }
   };
 
+  // Save new address for logged-in users
+  const handleSaveNewAddress = async () => {
+    // Validate the form first
+    const errors = {};
+    if (!guestInfo.name.trim()) errors.name = 'Name is required';
+    if (!guestInfo.phone.trim()) errors.phone = 'Phone is required';
+    else if (!/^\d{10}$/.test(guestInfo.phone.replace(/\D/g, ''))) errors.phone = 'Enter 10-digit phone number';
+    if (!guestInfo.address.trim()) errors.address = 'Address is required';
+    if (!guestInfo.city.trim()) errors.city = 'City is required';
+    if (!guestInfo.state.trim()) errors.state = 'State is required';
+    if (!guestInfo.pincode.trim()) errors.pincode = 'Pincode is required';
+    else if (!/^\d{6}$/.test(guestInfo.pincode)) errors.pincode = 'Enter 6-digit pincode';
+    
+    setGuestFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fill in all required fields correctly.');
+      return;
+    }
+
+    try {
+      const newAddress = {
+        name: guestInfo.name,
+        phone: guestInfo.phone,
+        address: guestInfo.address,
+        city: guestInfo.city,
+        state: guestInfo.state,
+        pincode: guestInfo.pincode,
+        isDefault: savedAddresses.length === 0 // Make it default if first address
+      };
+
+      const response = await fetch(`${API_ENDPOINTS.USERS}/${user.id}/addresses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newAddress)
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Address saved successfully! ✅');
+        // Update saved addresses list
+        setSavedAddresses(prev => [...prev, data.address]);
+        // Select the new address
+        setSelectedAddressId(data.address._id);
+        // Hide the form
+        setShowNewAddressForm(false);
+        // Clear the form
+        setGuestInfo(prev => ({
+          ...prev,
+          name: '',
+          phone: '',
+          address: '',
+          city: '',
+          state: '',
+          pincode: ''
+        }));
+      } else {
+        toast.error(data.message || 'Failed to save address');
+      }
+    } catch (error) {
+      console.error('Error saving address:', error);
+      toast.error('Failed to save address. Please try again.');
+    }
+  };
+
   // Helper to remove checked out items from wishlist
   const removeCheckedOutFromWishlist = (cartItems) => {
     if (Array.isArray(cartItems)) {
@@ -697,6 +762,61 @@ const Payment = () => {
                         />
                         {guestFormErrors.pincode && <span className="error-text">{guestFormErrors.pincode}</span>}
                       </div>
+                    </div>
+                    
+                    {/* Save Address Button for logged-in users */}
+                    <div className="save-address-btn-container" style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={handleSaveNewAddress}
+                        className="save-address-btn"
+                        style={{
+                          background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '12px 24px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'transform 0.2s, box-shadow 0.2s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.target.style.transform = 'translateY(-2px)';
+                          e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.target.style.transform = 'translateY(0)';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      >
+                        💾 Save Address
+                      </button>
+                      {savedAddresses.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNewAddressForm(false);
+                            setGuestInfo(prev => ({ ...prev, name: '', phone: '', address: '', city: '', state: '', pincode: '' }));
+                            setGuestFormErrors({});
+                          }}
+                          style={{
+                            background: '#f3f4f6',
+                            color: '#6b7280',
+                            border: '1px solid #d1d5db',
+                            padding: '12px 24px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            fontSize: '14px'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
