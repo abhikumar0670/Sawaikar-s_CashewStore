@@ -7,7 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FiPackage, FiShoppingCart, FiUsers, FiGrid, FiPlus, FiSearch, FiEdit2, FiTrash2, FiX, FiUpload, FiStar, FiTruck, FiCheck, FiHome, FiDollarSign, FiTrendingUp, FiCalendar, FiMail, FiEye, FiLogOut, FiBell, FiMenu, FiExternalLink, FiChevronDown, FiChevronRight, FiUser, FiShield, FiSettings, FiActivity, FiTag, FiGift, FiPercent, FiAlertTriangle, FiDownload } from "react-icons/fi";
 
 // API Base URL for production
-const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Admin email - change this to your admin email
 const ADMIN_EMAIL = "abhikumar0670@gmail.com";
@@ -199,7 +199,7 @@ const AdminProductContent = () => {
       hasFetched.current = true;
       
       // Fetch products
-      axios.get("${API_URL}/products")
+      axios.get(`${API_URL}/products")
         .then(response => {
           setProducts(response.data);
           setFilteredProducts(response.data);
@@ -210,7 +210,7 @@ const AdminProductContent = () => {
         });
 
       // Fetch orders
-      axios.get("${API_URL}/orders")
+      axios.get(`${API_URL}/orders")
         .then(response => {
           // Handle both array and object response formats
           const ordersData = Array.isArray(response.data) ? response.data : (response.data.orders || []);
@@ -222,7 +222,7 @@ const AdminProductContent = () => {
         });
 
       // Fetch customers
-      axios.get("${API_URL}/users")
+      axios.get(`${API_URL}/users")
         .then(response => {
           // API returns { success: true, users: [...] }
           const usersData = Array.isArray(response.data) ? response.data : (response.data.users || []);
@@ -234,7 +234,7 @@ const AdminProductContent = () => {
         });
 
       // Fetch coupons
-      axios.get("${API_URL}/coupons")
+      axios.get(`${API_URL}/coupons")
         .then(response => {
           setCoupons(response.data);
         })
@@ -425,7 +425,7 @@ const AdminProductContent = () => {
   // Refresh products (for after add/edit/delete)
   const refreshProducts = useCallback(async () => {
     try {
-      const response = await axios.get("${API_URL}/products");
+      const response = await axios.get(`${API_URL}/products");
       setProducts(response.data);
       setFilteredProducts(response.data);
     } catch (error) {
@@ -436,7 +436,7 @@ const AdminProductContent = () => {
   // Refresh orders
   const refreshOrders = useCallback(async () => {
     try {
-      const response = await axios.get("${API_URL}/orders");
+      const response = await axios.get(`${API_URL}/orders");
       setOrders(response.data.orders || response.data || []);
     } catch (error) {
       console.error("Error refreshing orders:", error);
@@ -616,7 +616,7 @@ const AdminProductContent = () => {
         console.log('📤 Sending product data:', productData);
         
         const response = await axios.post(
-          "${API_URL}/products/add",
+          `${API_URL}/products/add",
           productData
         );
         
@@ -984,12 +984,12 @@ const AdminProductContent = () => {
         await axios.put(`${API_URL}/coupons/${editingCoupon._id}`, couponData);
         toast.success("Coupon updated successfully! 🎉");
       } else {
-        await axios.post('${API_URL}/coupons', couponData);
+        await axios.post(`${API_URL}/coupons`, couponData);
         toast.success("Coupon created successfully! 🎉");
       }
       
       // Refresh coupons
-      const response = await axios.get("${API_URL}/coupons");
+      const response = await axios.get(`${API_URL}/coupons`);
       setCoupons(response.data);
       
       setShowCouponModal(false);
@@ -1012,7 +1012,7 @@ const AdminProductContent = () => {
       toast.success("Coupon deleted successfully!");
       
       // Refresh coupons
-      const response = await axios.get("${API_URL}/coupons");
+      const response = await axios.get(`${API_URL}/coupons");
       setCoupons(response.data);
     } catch (error) {
       console.error("Error deleting coupon:", error);
@@ -1027,7 +1027,7 @@ const AdminProductContent = () => {
       toast.success("Coupon status updated!");
       
       // Refresh coupons
-      const response = await axios.get("${API_URL}/coupons");
+      const response = await axios.get(`${API_URL}/coupons");
       setCoupons(response.data);
     } catch (error) {
       console.error("Error toggling coupon:", error);

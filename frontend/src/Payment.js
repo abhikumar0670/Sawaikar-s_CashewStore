@@ -273,7 +273,7 @@ const Payment = () => {
       // Step 1: Create Razorpay order on backend
       console.log('🔄 Creating Razorpay order for amount:', finalTotalRupees);
       
-      const orderResponse = await axios.post('${API_URL}/payment/create-order', {
+      const orderResponse = await axios.post(`${API_URL}/payment/create-order`, {
         amount: finalTotalRupees
       });
 
@@ -357,7 +357,7 @@ const Payment = () => {
             console.log('📤 Sending order data to backend:', orderData);
 
             // Verify payment and save order on backend (CRITICAL STEP)
-            const verifyResponse = await axios.post('${API_URL}/payment/verify-payment', {
+            const verifyResponse = await axios.post(`${API_URL}/payment/verify-payment`, {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
@@ -372,7 +372,7 @@ const Payment = () => {
               // Mark coupon as used if one was applied
               if (couponApplied && couponCode) {
                 try {
-                  await axios.post('${API_URL}/coupons/apply', {
+                  await axios.post(`${API_URL}/coupons/apply`, {
                     code: couponCode,
                     userEmail: getUserEmail(),
                     orderAmount: finalTotalPaise / 100 // Send in rupees
