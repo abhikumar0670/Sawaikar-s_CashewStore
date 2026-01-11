@@ -1,4 +1,65 @@
 const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
+
+// Send email using Gmail REST API (works on Render - uses HTTPS, not SMTP)
+const sendWithGmailAPI = async (mailOptions) => {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'https://developers.google.com/oauthplayground'
+  );
+  
+  oauth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN
+  });
+  
+  // Get access token
+  const { token } = await oauth2Client.getAccessToken();
+  
+  // Create email content
+  const fromMatch = mailOptions.from.match(/"?([^"<]+)"?\s*<([^>]+)>/);
+  const senderName = fromMatch ? fromMatch[1].trim() : 'Sawaikar\'s Cashew Store';
+  const senderEmail = fromMatch ? fromMatch[2] : process.env.EMAIL_USER;
+  
+  // Create MIME message
+  const messageParts = [
+    `From: "${senderName}" <${senderEmail}>`,
+    `To: ${mailOptions.to}`,
+    `Subject: ${mailOptions.subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/alternative; boundary="boundary"',
+    '',
+    '--boundary',
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    mailOptions.text || '',
+    '',
+    '--boundary',
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    mailOptions.html || '',
+    '',
+    '--boundary--'
+  ];
+  
+  const message = messageParts.join('\n');
+  const encodedMessage = Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  
+  // Send via Gmail API
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const result = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: {
+      raw: encodedMessage
+    }
+  });
+  
+  return { messageId: result.data.id };
+};
 
 // Send email using Mailjet HTTP API (works immediately, any recipient)
 const sendWithMailjetAPI = async (mailOptions) => {
@@ -346,7 +407,8 @@ const sendOrderConfirmationEmail = async (order) => {
     '</html>';
 
   // Determine sender email based on provider
-  // Priority: Mailjet > Brevo > Resend > SMTP
+  // Priority: Gmail API > Mailjet > Brevo > Resend > SMTP
+  const useGmailAPI = !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET && process.env.GMAIL_REFRESH_TOKEN);
   const useMailjetAPI = !!(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY);
   const useBrevoAPI = !!process.env.BREVO_API_KEY;
   const useResendAPI = !!process.env.RESEND_API_KEY;
@@ -362,8 +424,16 @@ const sendOrderConfirmationEmail = async (order) => {
   };
 
   try {
-    // Priority 1: Mailjet API (works immediately, any recipient)
-    if (useMailjetAPI) {
+    // Priority 1: Gmail API (works on Render, uses your Gmail account)
+    if (useGmailAPI) {
+      console.log('📧 Sending via Gmail API to:', order.userEmail);
+      const info = await sendWithGmailAPI(mailOptions);
+      console.log('✅ Order confirmation email sent via Gmail API to ' + order.userEmail);
+      console.log('   Message ID: ' + info.messageId);
+      return { success: true, messageId: info.messageId, provider: 'Gmail API' };
+    }
+    // Priority 2: Mailjet API (works immediately, any recipient)
+    else if (useMailjetAPI) {
       console.log('📧 Sending via Mailjet HTTP API to:', order.userEmail);
       const info = await sendWithMailjetAPI(mailOptions);
       console.log('✅ Order confirmation email sent via Mailjet to ' + order.userEmail);
