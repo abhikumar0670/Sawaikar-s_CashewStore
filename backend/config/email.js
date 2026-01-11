@@ -1,5 +1,39 @@
 const nodemailer = require('nodemailer');
 
+// Send email using Mailjet HTTP API (works immediately, any recipient)
+const sendWithMailjetAPI = async (mailOptions) => {
+  const fromMatch = mailOptions.from.match(/"?([^"<]+)"?\s*<([^>]+)>/);
+  const senderName = fromMatch ? fromMatch[1].trim() : 'Sawaikar\'s Cashew Store';
+  const senderEmail = fromMatch ? fromMatch[2] : process.env.EMAIL_USER;
+  
+  const auth = Buffer.from(`${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`).toString('base64');
+  
+  const response = await fetch('https://api.mailjet.com/v3.1/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      Messages: [{
+        From: { Email: senderEmail, Name: senderName },
+        To: [{ Email: mailOptions.to }],
+        Subject: mailOptions.subject,
+        HTMLPart: mailOptions.html,
+        TextPart: mailOptions.text
+      }]
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (!response.ok || (data.Messages && data.Messages[0].Status === 'error')) {
+    throw new Error(data.ErrorMessage || JSON.stringify(data) || 'Mailjet API error');
+  }
+  
+  return { messageId: data.Messages?.[0]?.To?.[0]?.MessageID || 'sent' };
+};
+
 // Send email using Resend HTTP API (requires verified domain for real recipients)
 const sendWithResendAPI = async (mailOptions) => {
   const response = await fetch('https://api.resend.com/emails', {
@@ -26,7 +60,7 @@ const sendWithResendAPI = async (mailOptions) => {
   return { messageId: data.id };
 };
 
-// Send email using Brevo HTTP API (works with Gmail sender, any recipient)
+// Send email using Brevo HTTP API (requires account activation)
 const sendWithBrevoAPI = async (mailOptions) => {
   // Parse sender info
   const fromMatch = mailOptions.from.match(/"?([^"<]+)"?\s*<([^>]+)>/);
@@ -312,7 +346,8 @@ const sendOrderConfirmationEmail = async (order) => {
     '</html>';
 
   // Determine sender email based on provider
-  // Priority: Brevo > Resend (with verified domain) > SMTP
+  // Priority: Mailjet > Brevo > Resend > SMTP
+  const useMailjetAPI = !!(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY);
   const useBrevoAPI = !!process.env.BREVO_API_KEY;
   const useResendAPI = !!process.env.RESEND_API_KEY;
   
@@ -327,8 +362,16 @@ const sendOrderConfirmationEmail = async (order) => {
   };
 
   try {
-    // Priority 1: Brevo API (works with Gmail sender, any recipient)
-    if (useBrevoAPI) {
+    // Priority 1: Mailjet API (works immediately, any recipient)
+    if (useMailjetAPI) {
+      console.log('📧 Sending via Mailjet HTTP API to:', order.userEmail);
+      const info = await sendWithMailjetAPI(mailOptions);
+      console.log('✅ Order confirmation email sent via Mailjet to ' + order.userEmail);
+      console.log('   Message ID: ' + info.messageId);
+      return { success: true, messageId: info.messageId, provider: 'Mailjet' };
+    }
+    // Priority 2: Brevo API (requires account activation)
+    else if (useBrevoAPI) {
       console.log('📧 Sending via Brevo HTTP API to:', order.userEmail);
       const info = await sendWithBrevoAPI(mailOptions);
       console.log('✅ Order confirmation email sent via Brevo to ' + order.userEmail);

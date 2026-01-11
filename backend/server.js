@@ -174,13 +174,24 @@ app.get('/api/test-email', async (req, res) => {
   try {
     const { sendOrderConfirmationEmail } = require('./config/email');
     
+    // Determine which provider will be used
+    const hasMailjet = !!(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY);
+    const hasBrevo = !!process.env.BREVO_API_KEY;
+    const hasResend = !!process.env.RESEND_API_KEY;
+    
+    let provider = 'Gmail SMTP (blocked on Render)';
+    if (hasMailjet) provider = 'Mailjet ✅';
+    else if (hasBrevo) provider = 'Brevo (needs activation)';
+    else if (hasResend) provider = 'Resend (needs verified domain)';
+    
     // Check environment variables
     const emailConfig = {
+      MAILJET_API_KEY: process.env.MAILJET_API_KEY ? `Set (${process.env.MAILJET_API_KEY.substring(0, 10)}...)` : 'Missing',
+      MAILJET_SECRET_KEY: process.env.MAILJET_SECRET_KEY ? `Set (${process.env.MAILJET_SECRET_KEY.length} chars)` : 'Missing',
       BREVO_API_KEY: process.env.BREVO_API_KEY ? `Set (${process.env.BREVO_API_KEY.substring(0, 10)}...)` : 'Missing',
       RESEND_API_KEY: process.env.RESEND_API_KEY ? `Set (${process.env.RESEND_API_KEY.substring(0, 10)}...)` : 'Missing',
       EMAIL_USER: process.env.EMAIL_USER ? 'Set' : 'Missing',
-      EMAIL_PASS: process.env.EMAIL_PASS ? `Set (${process.env.EMAIL_PASS.length} chars)` : 'Missing',
-      EMAIL_PROVIDER: process.env.BREVO_API_KEY ? 'Brevo (recommended)' : (process.env.RESEND_API_KEY ? 'Resend (needs verified domain)' : 'Gmail SMTP (blocked on Render)'),
+      EMAIL_PROVIDER: provider,
     };
     
     console.log('📧 Email config check:', emailConfig);
