@@ -5,16 +5,24 @@ const createTransporter = () => {
   // Check if email credentials are configured
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn('⚠️ Email credentials not configured. EMAIL_USER and EMAIL_PASS required.');
+    console.warn('   EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Missing');
+    console.warn('   EMAIL_PASS:', process.env.EMAIL_PASS ? 'Set' : 'Missing');
     return null;
   }
   
+  console.log('📧 Creating email transporter for:', process.env.EMAIL_USER);
+  
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: process.env.EMAIL_PORT || 587,
+    service: 'gmail', // Use Gmail service for better compatibility
+    host: 'smtp.gmail.com',
+    port: 587,
     secure: false,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
+    },
+    tls: {
+      rejectUnauthorized: false // Allow self-signed certificates
     }
   });
 };

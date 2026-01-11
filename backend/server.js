@@ -169,6 +169,52 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Email test endpoint (for debugging)
+app.get('/api/test-email', async (req, res) => {
+  try {
+    const { sendOrderConfirmationEmail } = require('./config/email');
+    
+    // Check environment variables
+    const emailConfig = {
+      EMAIL_USER: process.env.EMAIL_USER ? 'Set' : 'Missing',
+      EMAIL_PASS: process.env.EMAIL_PASS ? `Set (${process.env.EMAIL_PASS.length} chars)` : 'Missing',
+      EMAIL_HOST: process.env.EMAIL_HOST || 'Not set (using default)',
+    };
+    
+    console.log('📧 Email config check:', emailConfig);
+    
+    // Try sending a test email
+    const testOrder = {
+      orderId: 'TEST-' + Date.now(),
+      userEmail: process.env.EMAIL_USER, // Send to self for testing
+      userName: 'Test User',
+      items: [{ name: 'Test Product', quantity: 1, price: 10000 }],
+      totalAmount: 10000,
+      shippingFee: 0,
+      paymentStatus: 'completed',
+      transactionId: 'test_txn_123',
+      shippingAddress: { name: 'Test', street: '123 Test St', city: 'Test City', state: 'Test', pincode: '123456' },
+      createdAt: new Date()
+    };
+    
+    const result = await sendOrderConfirmationEmail(testOrder);
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'Test email sent successfully!' : 'Email failed',
+      emailConfig,
+      error: result.error || null
+    });
+  } catch (error) {
+    console.error('❌ Email test error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Seed data endpoint (for convenience)
 app.post('/api/seed', async (req, res) => {
   try {
