@@ -1,27 +1,44 @@
 const nodemailer = require('nodemailer');
 
 // Create transporter for sending emails
+// Using Resend API for reliable email delivery on cloud hosting (Render)
 const createTransporter = () => {
   // Check if email credentials are configured
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('⚠️ Email credentials not configured. EMAIL_USER and EMAIL_PASS required.');
-    console.warn('   EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Missing');
-    console.warn('   EMAIL_PASS:', process.env.EMAIL_PASS ? 'Set' : 'Missing');
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+  
+  // Try Resend first (works best with cloud hosting like Render)
+  if (resendApiKey) {
+    console.log('📧 Using Resend API for email delivery');
+    return nodemailer.createTransport({
+      host: 'smtp.resend.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'resend',
+        pass: resendApiKey
+      }
+    });
+  }
+  
+  // Fallback to Gmail SMTP (may not work on some cloud hosting)
+  if (!emailUser || !emailPass) {
+    console.warn('⚠️ Email credentials not configured. EMAIL_USER and EMAIL_PASS or RESEND_API_KEY required.');
     return null;
   }
   
-  console.log('📧 Creating email transporter for:', process.env.EMAIL_USER);
+  console.log('📧 Using Gmail SMTP for:', emailUser);
   
-  // Use SSL on port 465 for better compatibility with cloud hosting (Render)
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
-    secure: true, // Use SSL
+    secure: true,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      user: emailUser,
+      pass: emailPass
     },
-    connectionTimeout: 10000, // 10 seconds
+    connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000
   });
@@ -272,8 +289,13 @@ const sendOrderConfirmationEmail = async (order) => {
     '</body>' +
     '</html>';
 
+  // Determine sender email based on provider
+  const fromEmail = process.env.RESEND_API_KEY 
+    ? '"Sawaikar\'s Cashew Store" <onboarding@resend.dev>'
+    : '"Sawaikar\'s Cashew Store" <' + process.env.EMAIL_USER + '>';
+
   const mailOptions = {
-    from: '"Sawaikar\'s Cashew Store" <' + process.env.EMAIL_USER + '>',
+    from: fromEmail,
     to: order.userEmail,
     subject: 'Order Confirmed! 🥜 ' + order.orderId + ' | Sawaikar\'s Cashew Store',
     text: plainTextEmail,
