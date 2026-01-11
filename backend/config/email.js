@@ -60,11 +60,11 @@ const sendOrderConfirmationEmail = async (order) => {
   });
   const currentYear = new Date().getFullYear();
   
-  // Prices: item.price is in paise, order.totalAmount is in rupees
-  const subtotal = formatPrice((order.totalAmount - (order.shippingFee || 0)) * 100);
+  // Prices: item.price is in paise, order.totalAmount is also in paise
+  const subtotal = formatPrice(order.totalAmount - (order.shippingFee || 0));
   const shipping = (order.shippingFee || 0);
-  const shippingDisplay = shipping > 0 ? '₹' + formatPrice(shipping * 100) : 'FREE';
-  const total = formatPrice(order.totalAmount * 100);
+  const shippingDisplay = shipping > 0 ? '₹' + formatPrice(shipping) : 'FREE';
+  const total = formatPrice(order.totalAmount);
   
   const paymentStatusBadge = order.paymentStatus === 'completed' 
     ? '<span style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">✓ PAID</span>'

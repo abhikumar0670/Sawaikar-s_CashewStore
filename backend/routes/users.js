@@ -165,6 +165,43 @@ router.patch('/:clerkId/add-order', async (req, res) => {
   }
 });
 
+// @route   PATCH /api/users/:clerkId/profile
+// @desc    Update user profile (phone, etc.)
+// @access  Public
+router.patch('/:clerkId/profile', async (req, res) => {
+  try {
+    const { phone, name, email } = req.body;
+
+    const updateData = {};
+    if (phone !== undefined) updateData.phone = phone;
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+
+    const user = await User.findOneAndUpdate(
+      { clerkId: req.params.clerkId },
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    console.log(`✅ User profile updated: ${user.email}`);
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('❌ Update profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error',
+      error: error.message 
+    });
+  }
+});
+
 // ===========================================
 // ADDRESS MANAGEMENT ROUTES
 // ===========================================

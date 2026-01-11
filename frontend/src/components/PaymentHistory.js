@@ -116,7 +116,10 @@ const PaymentHistory = () => {
           products: order.items || [],
           paymentInfo: order.paymentInfo || {},
           upiId: order.paymentInfo?.vpa || order.paymentInfo?.upiId,
-          bank: order.paymentInfo?.bank
+          bank: order.paymentInfo?.bank,
+          // Include shipping address from order
+          shippingAddress: order.shippingAddress || null,
+          userPhone: order.userPhone || order.shippingAddress?.phone || ''
         }));
         
         // Sort by most recent first
@@ -208,11 +211,42 @@ const PaymentHistory = () => {
       itemName = txn.productName || txn.name || txn.itemName || txn.description || '-';
     }
     const itemQty = txn.qty || 1;
-    const itemRate = txn.amount || 0;
     
-    // Get fresh customer info for invoice
-    const customerInfo = getCustomerInfo();
-    const customerAddress = [customerInfo.address, customerInfo.city, customerInfo.state, customerInfo.pin].filter(Boolean).join(', ') || 'Address not provided';
+    // FIX: Amount is stored in paise, convert to rupees for display
+    // Razorpay stores amounts in paise (smallest currency unit)
+    // If amount is > 10000, it's likely in paise (e.g., ₹100 = 10000 paise)
+    const amountInPaise = txn.amount || 0;
+    const amountInRupees = amountInPaise > 10000 ? amountInPaise / 100 : amountInPaise;
+    const itemRate = amountInRupees;
+    
+    // Get customer info - prefer shipping address from order, then fallback to Clerk
+    const shippingAddr = txn.shippingAddress;
+    let customerInfo;
+    let customerAddress;
+    
+    console.log('Invoice - Shipping Address:', shippingAddr); // Debug log
+    
+    if (shippingAddr && (shippingAddr.address || shippingAddr.street || shippingAddr.city)) {
+      // Use shipping address from order
+      customerInfo = {
+        name: shippingAddr.name || getCustomerInfo().name,
+        address: shippingAddr.address || shippingAddr.street || '',
+        city: shippingAddr.city || '',
+        state: shippingAddr.state || '',
+        pin: shippingAddr.pincode || shippingAddr.zipCode || shippingAddr.pin || '',
+        email: getCustomerInfo().email,
+        phone: shippingAddr.phone || txn.userPhone || ''
+      };
+      customerAddress = [customerInfo.address, customerInfo.city, customerInfo.state, customerInfo.pin].filter(Boolean).join(', ');
+      if (!customerAddress) customerAddress = 'Address not provided';
+    } else {
+      // Fallback to Clerk user info
+      customerInfo = getCustomerInfo();
+      customerAddress = [customerInfo.address, customerInfo.city, customerInfo.state, customerInfo.pin].filter(Boolean).join(', ') || 'Address not provided';
+    }
+    
+    // Final display amount in rupees
+    const displayAmount = amountInRupees;
     
     const invoiceHtml = `
       <html><head><title>Invoice - ${orderId}</title><style>
@@ -255,8 +289,8 @@ const PaymentHistory = () => {
               <div class="section-title">BILL TO (Customer)</div>
               <div class="customer-name">${customerInfo.name}</div>
               <div class="info-line">${customerAddress}</div>
-              <div class="info-line">✉️ ${customerInfo.email}</div>
               ${customerInfo.phone ? `<div class="info-line">📞 ${customerInfo.phone}</div>` : ''}
+              <div class="info-line">✉️ ${customerInfo.email}</div>
             </td>
             <td>
               <div class="section-title">SHIP TO</div>
@@ -279,12 +313,12 @@ const PaymentHistory = () => {
             <td style="text-align: center;">1</td>
             <td>${itemName}</td>
             <td style="text-align: center;">${itemQty}</td>
-            <td style="text-align: right;">₹${Number(itemRate).toLocaleString()}</td>
-            <td style="text-align: right;">₹${Number(itemRate).toLocaleString()}</td>
+            <td style="text-align: right;">₹${Number(displayAmount).toLocaleString()}</td>
+            <td style="text-align: right;">₹${Number(displayAmount).toLocaleString()}</td>
           </tr>
         </table>
         <div class="total-section">
-          <b>Total Amount: ₹${Number(txn.amount).toLocaleString()}</b><br/>
+          <b>Total Amount: ₹${Number(displayAmount).toLocaleString()}</b><br/>
           <b>Status: <span style="color: ${txn.status?.toLowerCase() === 'success' || txn.status?.toLowerCase() === 'confirmed' ? '#2e7d32' : '#e74c3c'};">${txn.status}</span></b>
         </div>
         <br/>
@@ -345,11 +379,15 @@ const PaymentHistory = () => {
                           const statusColor = ['success', 'completed', 'confirmed'].includes(txn.status?.toLowerCase()) ? '#28a745' : 
                                              txn.status?.toLowerCase() === 'cancelled' ? '#888' : '#e74c3c';
                           
+                          // Convert amount from paise to rupees if needed
+                          // Razorpay stores amounts in paise (₹100 = 10000 paise)
+                          const displayAmount = txn.amount > 10000 ? (txn.amount / 100) : txn.amount;
+                          
                           return (
                             <tr key={idx} style={{borderBottom:'1px solid #f0f0f0', height: '52px'}}>
                               <td style={{padding:'14px 10px'}}>{txn.date}</td>
                               <td style={{padding:'14px 18px', fontWeight: 500, fontSize: '1.08rem', letterSpacing: '0.5px'}}>{itemName}</td>
-                              <td style={{padding:'14px 10px'}}>₹{txn.amount}</td>
+                              <td style={{padding:'14px 10px'}}>₹{Number(displayAmount).toLocaleString()}</td>
                               <td style={{padding:'14px 10px'}}>
                                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                   {paymentDisplay.icon}

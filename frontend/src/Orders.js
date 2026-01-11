@@ -331,7 +331,7 @@ const Orders = () => {
                   );
                 })()}
               </div>
-              <div>Amount: <b style={{ color: '#8B4513' }}>₹{(order.totalAmount || order.totalPrice || 0).toLocaleString()}</b></div>
+              <div>Amount: <b style={{ color: '#8B4513' }}>₹{((order.totalAmount || order.totalPrice || 0) / 100).toLocaleString()}</b></div>
               <div style={{ color: '#666', fontSize: '0.9rem' }}>
                 Ordered: {order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}
               </div>
@@ -366,7 +366,10 @@ const Orders = () => {
               </Button>
               {order.paymentStatus === 'completed' && (
                 <Button 
-                  onClick={() => navigate('/profile', { state: { activeTab: 'payments' } })}
+                  onClick={() => toast.info('📄 Visit Payment History to view/download invoice', { 
+                    position: 'top-right',
+                    autoClose: 3000 
+                  })}
                   title="View/Download Invoice"
                 >
                   <FiFileText style={{ marginRight: '6px' }} />

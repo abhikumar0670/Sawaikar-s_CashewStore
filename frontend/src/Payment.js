@@ -7,6 +7,7 @@ import { useCartContext } from "./context/cart_context";
 import { useWishlistContext } from "./context/wishlist_context";
 import { useUser } from "@clerk/clerk-react";
 import FormatPrice from "./Helpers/FormatPrice";
+import { API_ENDPOINTS } from "./config/api";
 
 const Payment = () => {
   const { user, isSignedIn } = useUser();
@@ -16,6 +17,11 @@ const Payment = () => {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  
+  // Saved addresses state
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
   
   // Guest checkout state
   const [isGuestCheckout, setIsGuestCheckout] = useState(false);
@@ -84,6 +90,35 @@ const Payment = () => {
     loadRazorpayScript().then(setRazorpayLoaded);
   }, []);
 
+  // Fetch saved addresses for logged-in users
+  useEffect(() => {
+    const fetchSavedAddresses = async () => {
+      if (isSignedIn && user?.id) {
+        try {
+          const response = await fetch(`${API_ENDPOINTS.USERS}/${user.id}/addresses`);
+          const data = await response.json();
+          if (data.success && data.addresses.length > 0) {
+            setSavedAddresses(data.addresses);
+            // Select default address or first address
+            const defaultAddr = data.addresses.find(a => a.isDefault) || data.addresses[0];
+            setSelectedAddressId(defaultAddr._id);
+          } else {
+            setShowNewAddressForm(true);
+          }
+        } catch (error) {
+          console.error('Error fetching addresses:', error);
+          setShowNewAddressForm(true);
+        }
+      }
+    };
+    fetchSavedAddresses();
+  }, [isSignedIn, user?.id]);
+
+  // Get selected address
+  const getSelectedAddress = () => {
+    return savedAddresses.find(a => a._id === selectedAddressId);
+  };
+
   // Get user details helper functions (support guest checkout)
   const getClerkId = () => isGuestCheckout ? `guest-${Date.now()}` : (user?.id || '');
   const getUserEmail = () => {
@@ -104,6 +139,29 @@ const Payment = () => {
     if (isGuestCheckout) {
       return {
         name: guestInfo.name,
+        address: guestInfo.address,
+        city: guestInfo.city,
+        state: guestInfo.state,
+        pincode: guestInfo.pincode,
+        phone: guestInfo.phone
+      };
+    }
+    // For logged-in users, use selected saved address
+    const selectedAddr = getSelectedAddress();
+    if (selectedAddr) {
+      return {
+        name: selectedAddr.name,
+        address: selectedAddr.address,
+        city: selectedAddr.city,
+        state: selectedAddr.state,
+        pincode: selectedAddr.pincode,
+        phone: selectedAddr.phone
+      };
+    }
+    // Fallback to new address form
+    if (showNewAddressForm) {
+      return {
+        name: guestInfo.name || getUserName(),
         address: guestInfo.address,
         city: guestInfo.city,
         state: guestInfo.state,
@@ -179,6 +237,24 @@ const Payment = () => {
       return;
     }
 
+    // For logged-in users, check if address is selected or new address form is filled
+    if (isSignedIn && !isGuestCheckout) {
+      if (!selectedAddressId && showNewAddressForm && !validateGuestForm()) {
+        toast.error('Please select a delivery address or fill in the new address form.', {
+          duration: 3000,
+          position: 'top-center'
+        });
+        return;
+      }
+      if (!selectedAddressId && !showNewAddressForm && savedAddresses.length === 0) {
+        toast.error('Please add a delivery address to continue.', {
+          duration: 3000,
+          position: 'top-center'
+        });
+        return;
+      }
+    }
+
     if (cart.length === 0) {
       toast.error('Your cart is empty. Please add items before checkout.', {
         duration: 3000,
@@ -244,16 +320,12 @@ const Payment = () => {
               };
             });
 
-            // Get shipping address (from guest form or default)
-            const shippingAddr = isGuestCheckout ? getShippingAddress() : {
-              name: getUserName(),
-              street: '123 Main Street',
-              city: 'Mumbai',
-              state: 'Maharashtra',
-              pincode: '400001',
-              zipCode: '400001',
-              country: 'India'
-            };
+            // Get shipping address (from guest form or saved address)
+            const shippingAddr = getShippingAddress();
+            
+            if (!shippingAddr || !shippingAddr.address) {
+              throw new Error('Please select or add a delivery address');
+            }
 
             // CRITICAL: Ensure all required fields are sent
             const orderData = {
@@ -272,11 +344,11 @@ const Payment = () => {
                 state: shippingAddr.state || '',
                 pincode: shippingAddr.pincode || '',
                 zipCode: shippingAddr.pincode || shippingAddr.zipCode || '',
-                phone: isGuestCheckout ? guestInfo.phone : '',
+                phone: shippingAddr.phone || getUserPhone(),
                 country: 'India'
               },
               isGuestOrder: isGuestCheckout,
-              userPhone: getUserPhone()
+              userPhone: shippingAddr.phone || getUserPhone()
             };
 
             console.log('📤 Sending order data to backend:', orderData);
@@ -490,6 +562,143 @@ const Payment = () => {
                 <span className="detail-value total-amount"><FormatPrice price={finalTotalPaise} /></span>
               </div>
             </div>
+
+            {/* Delivery Address Section for Logged-in Users */}
+            {isSignedIn && (
+              <div className="delivery-address-section">
+                <h3>📦 Delivery Address</h3>
+                
+                {savedAddresses.length > 0 && (
+                  <div className="saved-addresses">
+                    {savedAddresses.map((addr) => (
+                      <div 
+                        key={addr._id} 
+                        className={`address-option ${selectedAddressId === addr._id ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedAddressId(addr._id);
+                          setShowNewAddressForm(false);
+                        }}
+                      >
+                        <div className="address-radio">
+                          <input 
+                            type="radio" 
+                            name="delivery-address" 
+                            checked={selectedAddressId === addr._id}
+                            onChange={() => {
+                              setSelectedAddressId(addr._id);
+                              setShowNewAddressForm(false);
+                            }}
+                          />
+                        </div>
+                        <div className="address-details">
+                          <div className="address-header">
+                            <span className="address-label">{addr.label}</span>
+                            {addr.isDefault && <span className="default-tag">Default</span>}
+                          </div>
+                          <p className="address-name">{addr.name}</p>
+                          <p className="address-phone">📞 {addr.phone}</p>
+                          <p className="address-full">
+                            {addr.address}, {addr.city}, {addr.state} - {addr.pincode}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <button 
+                      className="add-new-address-btn"
+                      onClick={() => {
+                        setShowNewAddressForm(!showNewAddressForm);
+                        if (!showNewAddressForm) setSelectedAddressId(null);
+                      }}
+                    >
+                      {showNewAddressForm ? '✕ Cancel' : '+ Add New Address'}
+                    </button>
+                  </div>
+                )}
+
+                {(showNewAddressForm || savedAddresses.length === 0) && (
+                  <div className="new-address-form">
+                    <h4>{savedAddresses.length === 0 ? 'Add Delivery Address' : 'New Address'}</h4>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Full Name *</label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={guestInfo.name}
+                          onChange={handleGuestInputChange}
+                          placeholder="Enter your full name"
+                          className={guestFormErrors.name ? 'error' : ''}
+                        />
+                        {guestFormErrors.name && <span className="error-text">{guestFormErrors.name}</span>}
+                      </div>
+                      <div className="form-group">
+                        <label>Phone Number *</label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={guestInfo.phone}
+                          onChange={handleGuestInputChange}
+                          placeholder="10-digit phone number"
+                          className={guestFormErrors.phone ? 'error' : ''}
+                        />
+                        {guestFormErrors.phone && <span className="error-text">{guestFormErrors.phone}</span>}
+                      </div>
+                    </div>
+                    <div className="form-group full-width">
+                      <label>Street Address *</label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={guestInfo.address}
+                        onChange={handleGuestInputChange}
+                        placeholder="House/Flat No., Street, Area"
+                        className={guestFormErrors.address ? 'error' : ''}
+                      />
+                      {guestFormErrors.address && <span className="error-text">{guestFormErrors.address}</span>}
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>City *</label>
+                        <input
+                          type="text"
+                          name="city"
+                          value={guestInfo.city}
+                          onChange={handleGuestInputChange}
+                          placeholder="City"
+                          className={guestFormErrors.city ? 'error' : ''}
+                        />
+                        {guestFormErrors.city && <span className="error-text">{guestFormErrors.city}</span>}
+                      </div>
+                      <div className="form-group">
+                        <label>State *</label>
+                        <input
+                          type="text"
+                          name="state"
+                          value={guestInfo.state}
+                          onChange={handleGuestInputChange}
+                          placeholder="State"
+                          className={guestFormErrors.state ? 'error' : ''}
+                        />
+                        {guestFormErrors.state && <span className="error-text">{guestFormErrors.state}</span>}
+                      </div>
+                      <div className="form-group">
+                        <label>Pincode *</label>
+                        <input
+                          type="text"
+                          name="pincode"
+                          value={guestInfo.pincode}
+                          onChange={handleGuestInputChange}
+                          placeholder="6-digit pincode"
+                          className={guestFormErrors.pincode ? 'error' : ''}
+                        />
+                        {guestFormErrors.pincode && <span className="error-text">{guestFormErrors.pincode}</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Guest Checkout Option */}
             {!isSignedIn && (
@@ -755,6 +964,195 @@ const Wrapper = styled.section`
       font-size: 1.4rem;
       color: #6b7280;
       font-weight: 600;
+    }
+  }
+
+  /* Delivery Address Section Styles */
+  .delivery-address-section {
+    margin-bottom: 2rem;
+    padding: 2rem;
+    background: #f9fafb;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+
+    h3 {
+      font-size: 1.8rem;
+      color: #2d2d2d;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+    }
+
+    .saved-addresses {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+
+      .address-option {
+        display: flex;
+        gap: 1rem;
+        padding: 1.5rem;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          border-color: #667eea;
+        }
+
+        &.selected {
+          border-color: #667eea;
+          background: linear-gradient(135deg, #667eea10, #764ba210);
+        }
+
+        .address-radio {
+          display: flex;
+          align-items: flex-start;
+          padding-top: 0.3rem;
+
+          input[type="radio"] {
+            width: 1.8rem;
+            height: 1.8rem;
+            accent-color: #667eea;
+            cursor: pointer;
+          }
+        }
+
+        .address-details {
+          flex: 1;
+
+          .address-header {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 0.5rem;
+
+            .address-label {
+              font-size: 1.2rem;
+              font-weight: 600;
+              color: #667eea;
+              background: rgba(102, 126, 234, 0.1);
+              padding: 0.3rem 0.8rem;
+              border-radius: 0.4rem;
+            }
+
+            .default-tag {
+              font-size: 1.1rem;
+              font-weight: 500;
+              color: #10b981;
+              background: rgba(16, 185, 129, 0.1);
+              padding: 0.3rem 0.8rem;
+              border-radius: 0.4rem;
+            }
+          }
+
+          .address-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 0 0 0.3rem 0;
+          }
+
+          .address-phone {
+            font-size: 1.3rem;
+            color: #6b7280;
+            margin: 0 0 0.5rem 0;
+          }
+
+          .address-full {
+            font-size: 1.3rem;
+            color: #374151;
+            line-height: 1.4;
+            margin: 0;
+          }
+        }
+      }
+
+      .add-new-address-btn {
+        padding: 1rem;
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: #667eea;
+        background: white;
+        border: 2px dashed #667eea;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(102, 126, 234, 0.05);
+        }
+      }
+    }
+
+    .new-address-form {
+      margin-top: 1.5rem;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+
+      h4 {
+        font-size: 1.5rem;
+        color: #2d2d2d;
+        margin-bottom: 1.5rem;
+        font-weight: 600;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .form-group {
+        margin-bottom: 0.5rem;
+
+        &.full-width {
+          grid-column: 1 / -1;
+          margin-bottom: 1rem;
+        }
+
+        label {
+          display: block;
+          font-size: 1.3rem;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 0.5rem;
+        }
+
+        input {
+          width: 100%;
+          padding: 1rem 1.2rem;
+          font-size: 1.4rem;
+          border: 2px solid #e5e7eb;
+          border-radius: 8px;
+          transition: all 0.3s ease;
+
+          &:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          }
+
+          &.error {
+            border-color: #ef4444;
+          }
+
+          &::placeholder {
+            color: #9ca3af;
+          }
+        }
+
+        .error-text {
+          display: block;
+          font-size: 1.2rem;
+          color: #ef4444;
+          margin-top: 0.4rem;
+        }
+      }
     }
   }
 
