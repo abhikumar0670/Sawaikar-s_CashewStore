@@ -184,10 +184,9 @@ app.get('/api/test-email', async (req, res) => {
     
     console.log('📧 Email config check:', emailConfig);
     
-    // Determine recipient email
-    const recipientEmail = process.env.RESEND_API_KEY 
-      ? 'delivered@resend.dev'  // Resend's test email address
-      : process.env.EMAIL_USER;
+    // Get email from query param or use default test address
+    // Usage: /api/test-email?to=your@email.com
+    const recipientEmail = req.query.to || 'delivered@resend.dev';
     
     // Try sending a test email
     const testOrder = {
@@ -210,6 +209,7 @@ app.get('/api/test-email', async (req, res) => {
       message: result.success ? 'Test email sent successfully!' : 'Email failed',
       emailConfig,
       sentTo: recipientEmail,
+      note: recipientEmail === 'delivered@resend.dev' ? 'This is a test address. Add ?to=your@email.com to send to your email' : null,
       error: result.error || null
     });
   } catch (error) {
