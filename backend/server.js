@@ -176,17 +176,23 @@ app.get('/api/test-email', async (req, res) => {
     
     // Check environment variables
     const emailConfig = {
+      RESEND_API_KEY: process.env.RESEND_API_KEY ? `Set (${process.env.RESEND_API_KEY.substring(0, 10)}...)` : 'Missing',
       EMAIL_USER: process.env.EMAIL_USER ? 'Set' : 'Missing',
       EMAIL_PASS: process.env.EMAIL_PASS ? `Set (${process.env.EMAIL_PASS.length} chars)` : 'Missing',
-      EMAIL_HOST: process.env.EMAIL_HOST || 'Not set (using default)',
+      EMAIL_PROVIDER: process.env.RESEND_API_KEY ? 'Resend' : 'Gmail SMTP (may not work on Render)',
     };
     
     console.log('📧 Email config check:', emailConfig);
     
+    // Determine recipient email
+    const recipientEmail = process.env.RESEND_API_KEY 
+      ? 'delivered@resend.dev'  // Resend's test email address
+      : process.env.EMAIL_USER;
+    
     // Try sending a test email
     const testOrder = {
       orderId: 'TEST-' + Date.now(),
-      userEmail: process.env.EMAIL_USER, // Send to self for testing
+      userEmail: recipientEmail,
       userName: 'Test User',
       items: [{ name: 'Test Product', quantity: 1, price: 10000 }],
       totalAmount: 10000,
@@ -203,6 +209,7 @@ app.get('/api/test-email', async (req, res) => {
       success: result.success,
       message: result.success ? 'Test email sent successfully!' : 'Email failed',
       emailConfig,
+      sentTo: recipientEmail,
       error: result.error || null
     });
   } catch (error) {
