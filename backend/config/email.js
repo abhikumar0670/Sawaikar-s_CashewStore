@@ -1,34 +1,42 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter for sending emails
-// Using Resend API for reliable email delivery on cloud hosting (Render)
+// Send email using Resend HTTP API (works on Render)
+const sendWithResendAPI = async (mailOptions) => {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+      html: mailOptions.html,
+      text: mailOptions.text
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || 'Resend API error');
+  }
+  
+  return { messageId: data.id };
+};
+
+// Create transporter for sending emails (fallback for local dev)
 const createTransporter = () => {
-  // Check if email credentials are configured
-  const resendApiKey = process.env.RESEND_API_KEY;
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS;
   
-  // Try Resend first (works best with cloud hosting like Render)
-  if (resendApiKey) {
-    console.log('📧 Using Resend API for email delivery');
-    return nodemailer.createTransport({
-      host: 'smtp.resend.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: 'resend',
-        pass: resendApiKey
-      }
-    });
-  }
-  
-  // Fallback to Gmail SMTP (may not work on some cloud hosting)
   if (!emailUser || !emailPass) {
-    console.warn('⚠️ Email credentials not configured. EMAIL_USER and EMAIL_PASS or RESEND_API_KEY required.');
+    console.warn('⚠️ Gmail credentials not configured for local fallback.');
     return null;
   }
   
-  console.log('📧 Using Gmail SMTP for:', emailUser);
+  console.log('📧 Using Gmail SMTP for local dev:', emailUser);
   
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -81,22 +89,8 @@ const generateAddressHtml = (shippingAddress) => {
 const sendOrderConfirmationEmail = async (order) => {
   console.log('📧 sendOrderConfirmationEmail called for:', order.userEmail);
   
-  const transporter = createTransporter();
-  
-  // Check if transporter is available
-  if (!transporter) {
-    console.warn('⚠️ Email transporter not available. Skipping email to: ' + order.userEmail);
-    return { success: false, error: 'Email service not configured' };
-  }
-  
-  // Verify transporter connection
-  try {
-    await transporter.verify();
-    console.log('✅ SMTP connection verified successfully');
-  } catch (verifyError) {
-    console.error('❌ SMTP verification failed:', verifyError.message);
-    return { success: false, error: 'SMTP connection failed: ' + verifyError.message };
-  }
+  // Check if Resend API is available (preferred for production/Render)
+  const useResendAPI = !!process.env.RESEND_API_KEY;
   
   // Calculate values
   const userName = order.userName || 'Valued Customer';
@@ -303,10 +297,24 @@ const sendOrderConfirmationEmail = async (order) => {
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Order confirmation email sent to ' + order.userEmail);
-    console.log('   Message ID: ' + info.messageId);
-    return { success: true, messageId: info.messageId };
+    // Use Resend HTTP API for production (Render), SMTP for local dev
+    if (useResendAPI) {
+      console.log('📧 Sending via Resend HTTP API...');
+      const info = await sendWithResendAPI(mailOptions);
+      console.log('✅ Order confirmation email sent via Resend to ' + order.userEmail);
+      console.log('   Message ID: ' + info.messageId);
+      return { success: true, messageId: info.messageId };
+    } else {
+      // Fallback to SMTP for local development
+      const transporter = createTransporter();
+      if (!transporter) {
+        return { success: false, error: 'Email service not configured' };
+      }
+      const info = await transporter.sendMail(mailOptions);
+      console.log('✅ Order confirmation email sent via SMTP to ' + order.userEmail);
+      console.log('   Message ID: ' + info.messageId);
+      return { success: true, messageId: info.messageId };
+    }
   } catch (error) {
     console.error('❌ Error sending email: ' + error.message);
     return { success: false, error: error.message };
