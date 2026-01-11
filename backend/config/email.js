@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 
-// Send email using Resend HTTP API (works on Render)
+// Send email using Resend HTTP API (requires verified domain for real recipients)
 const sendWithResendAPI = async (mailOptions) => {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -24,6 +24,37 @@ const sendWithResendAPI = async (mailOptions) => {
   }
   
   return { messageId: data.id };
+};
+
+// Send email using Brevo HTTP API (works with Gmail sender, any recipient)
+const sendWithBrevoAPI = async (mailOptions) => {
+  // Parse sender info
+  const fromMatch = mailOptions.from.match(/"?([^"<]+)"?\s*<([^>]+)>/);
+  const senderName = fromMatch ? fromMatch[1].trim() : 'Sawaikar\'s Cashew Store';
+  const senderEmail = fromMatch ? fromMatch[2] : process.env.EMAIL_USER;
+  
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: mailOptions.to }],
+      subject: mailOptions.subject,
+      htmlContent: mailOptions.html,
+      textContent: mailOptions.text
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || JSON.stringify(data) || 'Brevo API error');
+  }
+  
+  return { messageId: data.messageId };
 };
 
 // Create transporter for sending emails (fallback for local dev)
@@ -284,9 +315,11 @@ const sendOrderConfirmationEmail = async (order) => {
     '</html>';
 
   // Determine sender email based on provider
-  const fromEmail = process.env.RESEND_API_KEY 
-    ? '"Sawaikar\'s Cashew Store" <onboarding@resend.dev>'
-    : '"Sawaikar\'s Cashew Store" <' + process.env.EMAIL_USER + '>';
+  // Priority: Brevo > Resend (with verified domain) > SMTP
+  const useBrevoAPI = !!process.env.BREVO_API_KEY;
+  const useResendAPI = !!process.env.RESEND_API_KEY;
+  
+  const fromEmail = '"Sawaikar\'s Cashew Store" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
 
   const mailOptions = {
     from: fromEmail,
@@ -297,15 +330,25 @@ const sendOrderConfirmationEmail = async (order) => {
   };
 
   try {
-    // Use Resend HTTP API for production (Render), SMTP for local dev
-    if (useResendAPI) {
+    // Priority 1: Brevo API (works with Gmail sender, any recipient)
+    if (useBrevoAPI) {
+      console.log('📧 Sending via Brevo HTTP API to:', order.userEmail);
+      const info = await sendWithBrevoAPI(mailOptions);
+      console.log('✅ Order confirmation email sent via Brevo to ' + order.userEmail);
+      console.log('   Message ID: ' + info.messageId);
+      return { success: true, messageId: info.messageId, provider: 'Brevo' };
+    }
+    // Priority 2: Resend API (requires verified domain for real recipients)
+    else if (useResendAPI) {
       console.log('📧 Sending via Resend HTTP API...');
+      mailOptions.from = '"Sawaikar\'s Cashew Store" <onboarding@resend.dev>';
       const info = await sendWithResendAPI(mailOptions);
       console.log('✅ Order confirmation email sent via Resend to ' + order.userEmail);
       console.log('   Message ID: ' + info.messageId);
-      return { success: true, messageId: info.messageId };
-    } else {
-      // Fallback to SMTP for local development
+      return { success: true, messageId: info.messageId, provider: 'Resend' };
+    } 
+    // Priority 3: SMTP for local development
+    else {
       const transporter = createTransporter();
       if (!transporter) {
         return { success: false, error: 'Email service not configured' };

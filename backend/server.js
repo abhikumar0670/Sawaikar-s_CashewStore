@@ -176,10 +176,11 @@ app.get('/api/test-email', async (req, res) => {
     
     // Check environment variables
     const emailConfig = {
+      BREVO_API_KEY: process.env.BREVO_API_KEY ? `Set (${process.env.BREVO_API_KEY.substring(0, 10)}...)` : 'Missing',
       RESEND_API_KEY: process.env.RESEND_API_KEY ? `Set (${process.env.RESEND_API_KEY.substring(0, 10)}...)` : 'Missing',
       EMAIL_USER: process.env.EMAIL_USER ? 'Set' : 'Missing',
       EMAIL_PASS: process.env.EMAIL_PASS ? `Set (${process.env.EMAIL_PASS.length} chars)` : 'Missing',
-      EMAIL_PROVIDER: process.env.RESEND_API_KEY ? 'Resend' : 'Gmail SMTP (may not work on Render)',
+      EMAIL_PROVIDER: process.env.BREVO_API_KEY ? 'Brevo (recommended)' : (process.env.RESEND_API_KEY ? 'Resend (needs verified domain)' : 'Gmail SMTP (blocked on Render)'),
     };
     
     console.log('📧 Email config check:', emailConfig);
@@ -193,12 +194,12 @@ app.get('/api/test-email', async (req, res) => {
       orderId: 'TEST-' + Date.now(),
       userEmail: recipientEmail,
       userName: 'Test User',
-      items: [{ name: 'Test Product', quantity: 1, price: 10000 }],
-      totalAmount: 10000,
+      items: [{ name: 'Premium Cashews W240', quantity: 1, price: 59900 }],
+      totalAmount: 59900,
       shippingFee: 0,
       paymentStatus: 'completed',
       transactionId: 'test_txn_123',
-      shippingAddress: { name: 'Test', street: '123 Test St', city: 'Test City', state: 'Test', pincode: '123456' },
+      shippingAddress: { name: 'Test User', street: '123 Main St', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
       createdAt: new Date()
     };
     
@@ -208,8 +209,9 @@ app.get('/api/test-email', async (req, res) => {
       success: result.success,
       message: result.success ? 'Test email sent successfully!' : 'Email failed',
       emailConfig,
+      provider: result.provider || 'unknown',
       sentTo: recipientEmail,
-      note: recipientEmail === 'delivered@resend.dev' ? 'This is a test address. Add ?to=your@email.com to send to your email' : null,
+      note: recipientEmail === 'delivered@resend.dev' ? 'Add ?to=your@email.com to send to your actual email' : 'Check your inbox (and spam folder)!',
       error: result.error || null
     });
   } catch (error) {
