@@ -5,7 +5,9 @@ const User = require('../models/User');
 const Product = require('../models/Product');
 const { 
   sendOrderConfirmationEmail,
+  sendOrderProcessingEmail,
   sendOrderShippedEmail,
+  sendOutForDeliveryEmail,
   sendOrderDeliveredEmail
 } = require('../config/email');
 const { isAdmin } = require('../middleware/auth');
@@ -226,9 +228,13 @@ router.put('/:id/status', isAdmin, async (req, res) => {
     
     console.log(`✅ Order status updated: ${order.orderId} -> ${orderStatus || paymentStatus}`);
     
-    // Send status update emails
-    if (orderStatus === 'shipped') {
+    // Send status update emails for all status changes
+    if (orderStatus === 'processing') {
+      sendOrderProcessingEmail(order).catch(err => console.error('Email error:', err));
+    } else if (orderStatus === 'shipped') {
       sendOrderShippedEmail(order).catch(err => console.error('Email error:', err));
+    } else if (orderStatus === 'out_for_delivery') {
+      sendOutForDeliveryEmail(order).catch(err => console.error('Email error:', err));
     } else if (orderStatus === 'delivered') {
       sendOrderDeliveredEmail(order).catch(err => console.error('Email error:', err));
     }
@@ -284,9 +290,13 @@ router.put('/:orderId', isAdmin, async (req, res) => {
     
     console.log(`✅ Order updated: ${order.orderId}`);
     
-    // Send status update emails
-    if (orderStatus === 'shipped') {
+    // Send status update emails for all status changes
+    if (orderStatus === 'processing') {
+      sendOrderProcessingEmail(order).catch(err => console.error('Email error:', err));
+    } else if (orderStatus === 'shipped') {
       sendOrderShippedEmail(order).catch(err => console.error('Email error:', err));
+    } else if (orderStatus === 'out_for_delivery') {
+      sendOutForDeliveryEmail(order).catch(err => console.error('Email error:', err));
     } else if (orderStatus === 'delivered') {
       sendOrderDeliveredEmail(order).catch(err => console.error('Email error:', err));
     }

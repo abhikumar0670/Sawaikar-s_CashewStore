@@ -474,15 +474,50 @@ const sendOrderConfirmationEmail = async (order) => {
   }
 };
 
+// Generic email sending function that works with Gmail API
+const sendEmail = async (mailOptions) => {
+  const useGmailAPI = !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET && process.env.GMAIL_REFRESH_TOKEN);
+  const useMailjetAPI = !!(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY);
+  const useBrevoAPI = !!process.env.BREVO_API_KEY;
+  const useResendAPI = !!process.env.RESEND_API_KEY;
+  
+  try {
+    if (useGmailAPI) {
+      const info = await sendWithGmailAPI(mailOptions);
+      return { success: true, messageId: info.messageId, provider: 'Gmail API' };
+    } else if (useMailjetAPI) {
+      const info = await sendWithMailjetAPI(mailOptions);
+      return { success: true, messageId: info.messageId, provider: 'Mailjet' };
+    } else if (useBrevoAPI) {
+      const info = await sendWithBrevoAPI(mailOptions);
+      return { success: true, messageId: info.messageId, provider: 'Brevo' };
+    } else if (useResendAPI) {
+      mailOptions.from = '"Sawaikar\'s Cashew Store" <onboarding@resend.dev>';
+      const info = await sendWithResendAPI(mailOptions);
+      return { success: true, messageId: info.messageId, provider: 'Resend' };
+    } else {
+      const transporter = createTransporter();
+      if (!transporter) {
+        return { success: false, error: 'Email service not configured' };
+      }
+      const info = await transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId, provider: 'SMTP' };
+    }
+  } catch (error) {
+    console.error('❌ Error sending email:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send order shipped email
 const sendOrderShippedEmail = async (order) => {
-  const transporter = createTransporter();
   const userName = order.userName || 'Valued Customer';
   const currentYear = new Date().getFullYear();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const fromEmail = '"Sawaikar\'s Cashew Store" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
   
   const trackingInfo = order.trackingNumber 
-    ? '<p style="margin: 10px 0; color: #059669; font-size: 16px; font-weight: 700;">📦 Tracking Number: ' + order.trackingNumber + '</p>'
+    ? '<p style="margin: 10px 0; color: #059669; font-size: 16px; font-weight: 700;">Tracking Number: ' + order.trackingNumber + '</p>'
     : '';
   
   const estimatedDelivery = order.estimatedDelivery 
@@ -498,7 +533,6 @@ const sendOrderShippedEmail = async (order) => {
     
     '<!-- Header -->' +
     '<tr><td style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 35px 30px; text-align: center;">' +
-    '<span style="font-size: 50px;">🚚</span>' +
     '<h1 style="margin: 15px 0 5px 0; color: #FFFFFF; font-size: 28px; font-weight: 800;">Your Order is On Its Way!</h1>' +
     '<p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">Sawaikar\'s Premium Cashews</p>' +
     '</td></tr>' +
@@ -506,8 +540,8 @@ const sendOrderShippedEmail = async (order) => {
     '<!-- Content -->' +
     '<tr><td style="padding: 35px 30px;">' +
     '<p style="margin: 0 0 8px 0; color: #6B7280; font-size: 15px;">Hi <strong style="color: #059669;">' + userName + '</strong>,</p>' +
-    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px;">Great news! Your order has been shipped! 📦</h2>' +
-    '<p style="margin: 0 0 25px 0; color: #6B7280; font-size: 15px; line-height: 1.6;">Your premium cashews are on their way to you. Here are the shipping details:</p>' +
+    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px;">Great news! Your order has been shipped!</h2>' +
+    '<p style="margin: 0 0 25px 0; color: #6B7280; font-size: 15px; line-height: 1.6;">Your premium cashews are on their way to you.</p>' +
     
     '<!-- Order Info Box -->' +
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-radius: 12px; border: 2px solid #059669; margin-bottom: 25px;">' +
@@ -519,59 +553,174 @@ const sendOrderShippedEmail = async (order) => {
     '</td></tr>' +
     '</table>' +
     
-    '<!-- What to Expect -->' +
-    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #F0FDF4; border-radius: 12px; margin-bottom: 25px;">' +
-    '<tr><td style="padding: 20px; text-align: center;">' +
-    '<p style="margin: 0; color: #047857; font-size: 15px;"><strong>📍 What to Expect</strong></p>' +
-    '<p style="margin: 8px 0 0 0; color: #047857; font-size: 13px; line-height: 1.5;">Your order will be delivered to your doorstep. Please keep your phone handy for delivery updates!</p>' +
-    '</td></tr>' +
-    '</table>' +
-    
     '<!-- CTA Button -->' +
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">' +
     '<tr><td align="center">' +
-    '<a href="' + frontendUrl + '/orders" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-size: 15px; font-weight: 700; box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);">Track Your Order</a>' +
+    '<a href="' + frontendUrl + '/orders" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-size: 15px; font-weight: 700;">Track Your Order</a>' +
     '</td></tr>' +
     '</table>' +
     '</td></tr>' +
     
     '<!-- Footer -->' +
     '<tr><td style="background: linear-gradient(135deg, #047857 0%, #065F46 100%); padding: 25px; text-align: center;">' +
-    '<p style="margin: 0 0 10px 0; color: #FFFFFF; font-size: 14px;">Questions? Contact us at</p>' +
-    '<p style="margin: 0; color: #A7F3D0; font-size: 13px;">📧 support@sawaikarcashew.com | 📞 +91 98765 43210</p>' +
-    '<p style="margin: 15px 0 0 0; color: rgba(255,255,255,0.7); font-size: 12px;">© ' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
+    '<p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 12px;">' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
     '</td></tr>' +
     '</table></td></tr></table></body></html>';
 
-  const plainTextEmail = 'Hi ' + userName + ',\n\n' +
-    'Great news! Your order ' + order.orderId + ' has been shipped! 🚚\n\n' +
+  const plainTextEmail = 'Hi ' + userName + ',\n\nGreat news! Your order ' + order.orderId + ' has been shipped!\n\n' +
     (order.trackingNumber ? 'Tracking Number: ' + order.trackingNumber + '\n' : '') +
-    (order.estimatedDelivery ? 'Estimated Delivery: ' + new Date(order.estimatedDelivery).toLocaleDateString('en-IN') + '\n' : '') +
-    '\nTrack your order at: ' + frontendUrl + '/orders\n\n' +
-    'Thank you for choosing Sawaikar\'s Cashew Store!';
+    '\nTrack your order at: ' + frontendUrl + '/orders\n\nThank you for choosing Sawaikar\'s Cashew Store!';
 
-  try {
-    await transporter.sendMail({
-      from: '"Sawaikar\'s Cashew Store" <' + process.env.EMAIL_USER + '>',
-      to: order.userEmail,
-      subject: '🚚 Your Order is On Its Way! | ' + order.orderId,
-      text: plainTextEmail,
-      html: htmlEmail
-    });
-    console.log('✅ Shipped email sent to ' + order.userEmail);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error sending shipped email: ' + error.message);
-    return { success: false, error: error.message };
+  const result = await sendEmail({
+    from: fromEmail,
+    to: order.userEmail,
+    subject: 'Your Order is On Its Way! - ' + order.orderId,
+    text: plainTextEmail,
+    html: htmlEmail
+  });
+  
+  if (result.success) {
+    console.log('Shipped email sent to ' + order.userEmail);
   }
+  return result;
+};
+
+// Send order processing email
+const sendOrderProcessingEmail = async (order) => {
+  const userName = order.userName || 'Valued Customer';
+  const currentYear = new Date().getFullYear();
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const fromEmail = '"Sawaikar\'s Cashew Store" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
+
+  const htmlEmail = '<!DOCTYPE html>' +
+    '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>' +
+    '<body style="margin: 0; padding: 0; background-color: #FFF7ED; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Arial, sans-serif;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FFF7ED;">' +
+    '<tr><td align="center" style="padding: 20px 10px;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden;">' +
+    
+    '<!-- Header -->' +
+    '<tr><td style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); padding: 35px 30px; text-align: center;">' +
+    '<h1 style="margin: 15px 0 5px 0; color: #FFFFFF; font-size: 28px; font-weight: 800;">Your Order is Being Processed!</h1>' +
+    '<p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">Sawaikar\'s Premium Cashews</p>' +
+    '</td></tr>' +
+    
+    '<!-- Content -->' +
+    '<tr><td style="padding: 35px 30px;">' +
+    '<p style="margin: 0 0 8px 0; color: #6B7280; font-size: 15px;">Hi <strong style="color: #D97706;">' + userName + '</strong>,</p>' +
+    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px;">We\'re preparing your order!</h2>' +
+    '<p style="margin: 0 0 25px 0; color: #6B7280; font-size: 15px; line-height: 1.6;">Your premium cashews are being carefully packed and will be shipped soon.</p>' +
+    
+    '<!-- Order Info Box -->' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-radius: 12px; border: 2px solid #D97706; margin-bottom: 25px;">' +
+    '<tr><td style="padding: 20px;">' +
+    '<p style="margin: 0 0 5px 0; color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase;">Order ID</p>' +
+    '<p style="margin: 0; color: #D97706; font-size: 18px; font-weight: 800;">' + order.orderId + '</p>' +
+    '</td></tr>' +
+    '</table>' +
+    
+    '<!-- CTA Button -->' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">' +
+    '<tr><td align="center">' +
+    '<a href="' + frontendUrl + '/orders" style="display: inline-block; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #FFFFFF; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-size: 15px; font-weight: 700;">View Order Status</a>' +
+    '</td></tr>' +
+    '</table>' +
+    '</td></tr>' +
+    
+    '<!-- Footer -->' +
+    '<tr><td style="background: linear-gradient(135deg, #92400E 0%, #78350F 100%); padding: 25px; text-align: center;">' +
+    '<p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 12px;">' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
+    '</td></tr>' +
+    '</table></td></tr></table></body></html>';
+
+  const plainTextEmail = 'Hi ' + userName + ',\n\nYour order ' + order.orderId + ' is being processed!\n\n' +
+    'We are carefully preparing your premium cashews.\n\nTrack your order at: ' + frontendUrl + '/orders\n\nThank you!';
+
+  const result = await sendEmail({
+    from: fromEmail,
+    to: order.userEmail,
+    subject: 'Your Order is Being Processed - ' + order.orderId,
+    text: plainTextEmail,
+    html: htmlEmail
+  });
+  
+  if (result.success) {
+    console.log('Processing email sent to ' + order.userEmail);
+  }
+  return result;
+};
+
+// Send out for delivery email
+const sendOutForDeliveryEmail = async (order) => {
+  const userName = order.userName || 'Valued Customer';
+  const currentYear = new Date().getFullYear();
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const fromEmail = '"Sawaikar\'s Cashew Store" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
+
+  const htmlEmail = '<!DOCTYPE html>' +
+    '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>' +
+    '<body style="margin: 0; padding: 0; background-color: #FFF7ED; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Arial, sans-serif;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FFF7ED;">' +
+    '<tr><td align="center" style="padding: 20px 10px;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden;">' +
+    
+    '<!-- Header -->' +
+    '<tr><td style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); padding: 35px 30px; text-align: center;">' +
+    '<h1 style="margin: 15px 0 5px 0; color: #FFFFFF; font-size: 28px; font-weight: 800;">Out for Delivery!</h1>' +
+    '<p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">Sawaikar\'s Premium Cashews</p>' +
+    '</td></tr>' +
+    
+    '<!-- Content -->' +
+    '<tr><td style="padding: 35px 30px;">' +
+    '<p style="margin: 0 0 8px 0; color: #6B7280; font-size: 15px;">Hi <strong style="color: #2563EB;">' + userName + '</strong>,</p>' +
+    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px;">Your order is out for delivery!</h2>' +
+    '<p style="margin: 0 0 25px 0; color: #6B7280; font-size: 15px; line-height: 1.6;">Get ready! Your premium cashews will arrive today. Please keep your phone handy.</p>' +
+    
+    '<!-- Order Info Box -->' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); border-radius: 12px; border: 2px solid #3B82F6; margin-bottom: 25px;">' +
+    '<tr><td style="padding: 20px;">' +
+    '<p style="margin: 0 0 5px 0; color: #1E40AF; font-size: 12px; font-weight: 600; text-transform: uppercase;">Order ID</p>' +
+    '<p style="margin: 0; color: #2563EB; font-size: 18px; font-weight: 800;">' + order.orderId + '</p>' +
+    '</td></tr>' +
+    '</table>' +
+    
+    '<!-- CTA Button -->' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">' +
+    '<tr><td align="center">' +
+    '<a href="' + frontendUrl + '/orders" style="display: inline-block; background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: #FFFFFF; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-size: 15px; font-weight: 700;">Track Delivery</a>' +
+    '</td></tr>' +
+    '</table>' +
+    '</td></tr>' +
+    
+    '<!-- Footer -->' +
+    '<tr><td style="background: linear-gradient(135deg, #1E40AF 0%, #1E3A8A 100%); padding: 25px; text-align: center;">' +
+    '<p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 12px;">' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
+    '</td></tr>' +
+    '</table></td></tr></table></body></html>';
+
+  const plainTextEmail = 'Hi ' + userName + ',\n\nYour order ' + order.orderId + ' is out for delivery!\n\n' +
+    'Get ready - your premium cashews will arrive today!\n\nTrack at: ' + frontendUrl + '/orders\n\nThank you!';
+
+  const result = await sendEmail({
+    from: fromEmail,
+    to: order.userEmail,
+    subject: 'Out for Delivery! - ' + order.orderId,
+    text: plainTextEmail,
+    html: htmlEmail
+  });
+  
+  if (result.success) {
+    console.log('Out for delivery email sent to ' + order.userEmail);
+  }
+  return result;
 };
 
 // Send order delivered email
 const sendOrderDeliveredEmail = async (order) => {
-  const transporter = createTransporter();
   const userName = order.userName || 'Valued Customer';
   const currentYear = new Date().getFullYear();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const fromEmail = '"Sawaikar\'s Cashew Store" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
 
   const htmlEmail = '<!DOCTYPE html>' +
     '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>' +
@@ -582,15 +731,14 @@ const sendOrderDeliveredEmail = async (order) => {
     
     '<!-- Header -->' +
     '<tr><td style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); padding: 35px 30px; text-align: center;">' +
-    '<span style="font-size: 50px;">🎉</span>' +
-    '<h1 style="margin: 15px 0 5px 0; color: #FFFFFF; font-size: 28px; font-weight: 800;">Your Order Has Arrived!</h1>' +
+    '<h1 style="margin: 15px 0 5px 0; color: #FFFFFF; font-size: 28px; font-weight: 800;">Order Delivered!</h1>' +
     '<p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">Sawaikar\'s Premium Cashews</p>' +
     '</td></tr>' +
     
     '<!-- Content -->' +
     '<tr><td style="padding: 35px 30px;">' +
     '<p style="margin: 0 0 8px 0; color: #6B7280; font-size: 15px;">Hi <strong style="color: #7C3AED;">' + userName + '</strong>,</p>' +
-    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px;">Your order has been delivered! 🥜</h2>' +
+    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px;">Your order has been delivered!</h2>' +
     '<p style="margin: 0 0 25px 0; color: #6B7280; font-size: 15px; line-height: 1.6;">We hope you enjoy your premium cashews! Your satisfaction means the world to us.</p>' +
     
     '<!-- Order Info Box -->' +
@@ -598,62 +746,54 @@ const sendOrderDeliveredEmail = async (order) => {
     '<tr><td style="padding: 20px; text-align: center;">' +
     '<p style="margin: 0 0 5px 0; color: #6D28D9; font-size: 12px; font-weight: 600; text-transform: uppercase;">Order ID</p>' +
     '<p style="margin: 0; color: #7C3AED; font-size: 18px; font-weight: 800;">' + order.orderId + '</p>' +
-    '<p style="margin: 15px 0 0 0; color: #059669; font-size: 16px; font-weight: 700;">✅ Delivered Successfully</p>' +
+    '<p style="margin: 15px 0 0 0; color: #059669; font-size: 16px; font-weight: 700;">Delivered Successfully</p>' +
     '</td></tr>' +
     '</table>' +
     
     '<!-- Review Request -->' +
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #FEF3C7; border-radius: 12px; margin-bottom: 25px;">' +
     '<tr><td style="padding: 20px; text-align: center;">' +
-    '<p style="margin: 0; color: #92400E; font-size: 15px;"><span style="font-size: 20px; margin-right: 8px;">⭐</span><strong>How was your experience?</strong></p>' +
-    '<p style="margin: 8px 0 0 0; color: #92400E; font-size: 13px; line-height: 1.5;">Your feedback helps us serve you better! Leave a review on the products you purchased.</p>' +
+    '<p style="margin: 0; color: #92400E; font-size: 15px;"><strong>How was your experience?</strong></p>' +
+    '<p style="margin: 8px 0 0 0; color: #92400E; font-size: 13px;">Your feedback helps us serve you better!</p>' +
     '</td></tr>' +
     '</table>' +
     
     '<!-- CTA Buttons -->' +
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">' +
-    '<tr><td align="center" style="padding-bottom: 10px;">' +
-    '<a href="' + frontendUrl + '/orders" style="display: inline-block; background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); color: #FFFFFF; text-decoration: none; padding: 14px 35px; border-radius: 10px; font-size: 14px; font-weight: 700; margin: 5px;">View Order Details</a>' +
-    '<a href="' + frontendUrl + '/products" style="display: inline-block; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #FFFFFF; text-decoration: none; padding: 14px 35px; border-radius: 10px; font-size: 14px; font-weight: 700; margin: 5px;">Shop Again</a>' +
+    '<tr><td align="center">' +
+    '<a href="' + frontendUrl + '/products" style="display: inline-block; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #FFFFFF; text-decoration: none; padding: 14px 35px; border-radius: 10px; font-size: 14px; font-weight: 700;">Shop Again</a>' +
     '</td></tr>' +
     '</table>' +
     '</td></tr>' +
     
     '<!-- Footer -->' +
     '<tr><td style="background: linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%); padding: 25px; text-align: center;">' +
-    '<p style="margin: 0 0 10px 0; color: #FFFFFF; font-size: 14px;">Thank you for choosing us! 💜</p>' +
-    '<p style="margin: 0; color: #DDD6FE; font-size: 13px;">📧 support@sawaikarcashew.com | 📞 +91 98765 43210</p>' +
-    '<p style="margin: 15px 0 0 0; color: rgba(255,255,255,0.7); font-size: 12px;">© ' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
+    '<p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 12px;">' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
     '</td></tr>' +
     '</table></td></tr></table></body></html>';
 
-  const plainTextEmail = 'Hi ' + userName + ',\n\n' +
-    'Your order ' + order.orderId + ' has been delivered! 🎉\n\n' +
-    'We hope you enjoy your premium cashews!\n\n' +
-    'Please leave a review to help us improve: ' + frontendUrl + '/orders\n\n' +
-    'Thank you for choosing Sawaikar\'s Cashew Store!';
+  const plainTextEmail = 'Hi ' + userName + ',\n\nYour order ' + order.orderId + ' has been delivered!\n\n' +
+    'We hope you enjoy your premium cashews!\n\nShop again at: ' + frontendUrl + '/products\n\nThank you!';
 
-  try {
-    await transporter.sendMail({
-      from: '"Sawaikar\'s Cashew Store" <' + process.env.EMAIL_USER + '>',
-      to: order.userEmail,
-      subject: '🎉 Your Order Has Been Delivered! | ' + order.orderId,
-      text: plainTextEmail,
-      html: htmlEmail
-    });
-    console.log('✅ Delivered email sent to ' + order.userEmail);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error sending delivered email: ' + error.message);
-    return { success: false, error: error.message };
+  const result = await sendEmail({
+    from: fromEmail,
+    to: order.userEmail,
+    subject: 'Order Delivered! - ' + order.orderId,
+    text: plainTextEmail,
+    html: htmlEmail
+  });
+  
+  if (result.success) {
+    console.log('Delivered email sent to ' + order.userEmail);
   }
+  return result;
 };
 
 // Send low stock alert email (to admin)
 const sendLowStockAlertEmail = async (products) => {
-  const transporter = createTransporter();
   const currentYear = new Date().getFullYear();
   const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+  const fromEmail = '"Sawaikar\'s Inventory Alert" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
   
   const productRows = products.map(p => 
     '<tr><td style="padding: 12px; border-bottom: 1px solid #FEE2E2;">' + p.name + '</td>' +
@@ -665,50 +805,48 @@ const sendLowStockAlertEmail = async (products) => {
     '<body style="margin: 0; padding: 0; background-color: #FEF2F2; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Arial, sans-serif;">' +
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FEF2F2;">' +
     '<tr><td align="center" style="padding: 20px 10px;">' +
-    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden;">' +
     
     '<!-- Header -->' +
     '<tr><td style="background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); padding: 30px; text-align: center;">' +
-    '<span style="font-size: 40px;">⚠️</span>' +
     '<h1 style="margin: 10px 0 0 0; color: #FFFFFF; font-size: 24px; font-weight: 800;">Low Stock Alert!</h1>' +
     '</td></tr>' +
     
     '<!-- Content -->' +
     '<tr><td style="padding: 30px;">' +
-    '<p style="margin: 0 0 20px 0; color: #6B7280; font-size: 15px;">The following products are running low on stock and need restocking:</p>' +
+    '<p style="margin: 0 0 20px 0; color: #6B7280; font-size: 15px;">The following products need restocking:</p>' +
     
-    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #FFFFFF; border-radius: 8px; overflow: hidden; border: 1px solid #FEE2E2;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border: 1px solid #FEE2E2;">' +
     '<tr style="background: #DC2626;"><th style="padding: 12px; text-align: left; color: white;">Product</th><th style="padding: 12px; text-align: center; color: white;">Stock</th></tr>' +
     productRows +
     '</table>' +
-    
-    '<p style="margin: 20px 0 0 0; color: #DC2626; font-size: 14px; font-weight: 600;">⚡ Please restock these items soon to avoid stockouts!</p>' +
     '</td></tr>' +
     
     '<!-- Footer -->' +
     '<tr><td style="background: #FEE2E2; padding: 20px; text-align: center;">' +
-    '<p style="margin: 0; color: #991B1B; font-size: 12px;">© ' + currentYear + ' Sawaikar\'s Cashew Store - Admin Alert</p>' +
+    '<p style="margin: 0; color: #991B1B; font-size: 12px;">' + currentYear + ' Sawaikar\'s Cashew Store</p>' +
     '</td></tr>' +
     '</table></td></tr></table></body></html>';
 
-  try {
-    await transporter.sendMail({
-      from: '"Sawaikar\'s Inventory Alert" <' + process.env.EMAIL_USER + '>',
-      to: adminEmail,
-      subject: '⚠️ Low Stock Alert - ' + products.length + ' Products Need Restocking',
-      html: htmlEmail
-    });
-    console.log('✅ Low stock alert sent to admin');
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error sending low stock alert: ' + error.message);
-    return { success: false, error: error.message };
+  const result = await sendEmail({
+    from: fromEmail,
+    to: adminEmail,
+    subject: 'Low Stock Alert - ' + products.length + ' Products Need Restocking',
+    html: htmlEmail,
+    text: 'Low stock alert: ' + products.map(p => p.name + ' (' + p.stock + ')').join(', ')
+  });
+  
+  if (result.success) {
+    console.log('Low stock alert sent to admin');
   }
+  return result;
 };
 
 module.exports = { 
   sendOrderConfirmationEmail,
+  sendOrderProcessingEmail,
   sendOrderShippedEmail,
+  sendOutForDeliveryEmail,
   sendOrderDeliveredEmail,
   sendLowStockAlertEmail
 };
