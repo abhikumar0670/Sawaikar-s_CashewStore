@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Sawaikar's Cashew Store - Full Stack E-Commerce Application",
   "scripts": {
-    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "cd backend && node server.js",
+    "build": "cd backend && npm install",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && node server.js",
     "client": "cd frontend && npm start",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
