@@ -2,6 +2,12 @@ const nodemailer = require('nodemailer');
 
 // Create transporter for sending emails
 const createTransporter = () => {
+  // Check if email credentials are configured
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn('⚠️ Email credentials not configured. EMAIL_USER and EMAIL_PASS required.');
+    return null;
+  }
+  
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: process.env.EMAIL_PORT || 587,
@@ -49,6 +55,12 @@ const generateAddressHtml = (shippingAddress) => {
 // Send order confirmation email
 const sendOrderConfirmationEmail = async (order) => {
   const transporter = createTransporter();
+  
+  // Check if transporter is available
+  if (!transporter) {
+    console.warn('⚠️ Email transporter not available. Skipping email to: ' + order.userEmail);
+    return { success: false, error: 'Email service not configured' };
+  }
   
   // Calculate values
   const userName = order.userName || 'Valued Customer';

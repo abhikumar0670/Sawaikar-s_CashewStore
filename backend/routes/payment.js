@@ -238,55 +238,50 @@ router.post('/verify-payment', async (req, res) => {
       throw saveError;
     }
 
-    // Step 4: Send Order Confirmation Email
-    let emailResult = { success: false };
-    try {
-      // Fetch user from database to get the most accurate email
-      let userEmail = orderData.user.email;
-      let userName = orderData.user.name || 'Valued Customer';
-      
-      if (orderData.user.clerkId) {
-        const dbUser = await User.findOne({ clerkId: orderData.user.clerkId });
-        if (dbUser && dbUser.email) {
-          userEmail = dbUser.email;
-          userName = dbUser.name || userName;
-        }
-      }
-      
-      // Prepare order object for email
-      const orderForEmail = {
-        orderId: newOrder.orderId,
-        userEmail: userEmail,
-        userName: userName,
-        items: newOrder.items,
-        totalAmount: newOrder.totalAmount,
-        shippingFee: newOrder.shippingFee || 0,
-        paymentStatus: newOrder.paymentStatus,
-        transactionId: newOrder.transactionId,
-        shippingAddress: newOrder.shippingAddress,
-        createdAt: newOrder.createdAt
-      };
-      
-      emailResult = await sendOrderConfirmationEmail(orderForEmail);
-    } catch (emailError) {
-      // Email failure should NOT fail the order
-      emailResult = { success: false, error: emailError.message };
-    }
-
-    // Step 5: Clear user's cart (if using MongoDB cart)
-    // Since you're using React context for cart, this is handled on frontend
-    // If you have a Cart model, uncomment and implement:
-    // const Cart = require('../models/Cart');
-    // await Cart.findOneAndDelete({ userId: orderData.user.clerkId });
-    // console.log('✅ Cart Cleared');
-
-    // Step 6: Return success response
+    // Step 4: Send response immediately (don't wait for email)
     res.status(200).json({
       success: true,
       message: 'Payment verified and order created successfully',
       orderId: newOrder.orderId,
       mongoOrderId: newOrder._id,
-      emailSent: emailResult.success
+      emailSent: 'pending' // Email will be sent asynchronously
+    });
+
+    // Step 5: Send Order Confirmation Email ASYNCHRONOUSLY (after response)
+    // This prevents the email from blocking the response
+    setImmediate(async () => {
+      try {
+        // Fetch user from database to get the most accurate email
+        let userEmail = orderData.user.email;
+        let userName = orderData.user.name || 'Valued Customer';
+        
+        if (orderData.user.clerkId) {
+          const dbUser = await User.findOne({ clerkId: orderData.user.clerkId });
+          if (dbUser && dbUser.email) {
+            userEmail = dbUser.email;
+            userName = dbUser.name || userName;
+          }
+        }
+        
+        // Prepare order object for email
+        const orderForEmail = {
+          orderId: newOrder.orderId,
+          userEmail: userEmail,
+          userName: userName,
+          items: newOrder.items,
+          totalAmount: newOrder.totalAmount,
+          shippingFee: newOrder.shippingFee || 0,
+          paymentStatus: newOrder.paymentStatus,
+          transactionId: newOrder.transactionId,
+          shippingAddress: newOrder.shippingAddress,
+          createdAt: newOrder.createdAt
+        };
+        
+        const emailResult = await sendOrderConfirmationEmail(orderForEmail);
+        console.log('📧 Email sent:', emailResult.success ? 'Yes' : 'No');
+      } catch (emailError) {
+        console.error('❌ Email sending failed (async):', emailError.message);
+      }
     });
 
   } catch (error) {

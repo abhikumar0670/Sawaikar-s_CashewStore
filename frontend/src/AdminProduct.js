@@ -904,15 +904,26 @@ const AdminProductContent = () => {
       const product = products.find(p => p.id === productId);
       if (!product) return;
       
+      // Include user email for admin authentication
+      const userEmail = user?.primaryEmailAddress?.emailAddress;
+      
       await axios.put(`${API_URL}/products/${productId}`, {
         ...product,
-        stock: parseInt(newStock)
+        stock: parseInt(newStock),
+        userEmail: userEmail // Required for admin auth
       });
       
       // Update local state
       setProducts(prev => prev.map(p => 
         p.id === productId ? { ...p, stock: parseInt(newStock) } : p
       ));
+      
+      // Also update filtered products
+      setFilteredProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, stock: parseInt(newStock) } : p
+      ));
+      
+      toast.success(`Stock updated to ${newStock} units!`);
       
       // Add notification for stock replenishment
       if (parseInt(newStock) >= lowStockThreshold) {
@@ -927,7 +938,7 @@ const AdminProductContent = () => {
       }
     } catch (error) {
       console.error('Error updating stock:', error);
-      alert('Failed to update stock. Please try again.');
+      toast.error('Failed to update stock. Please try again.');
     }
   };
 
