@@ -418,7 +418,7 @@ const sendOrderConfirmationEmail = async (order) => {
   const mailOptions = {
     from: fromEmail,
     to: order.userEmail,
-    subject: 'Order Confirmed! 🥜 ' + order.orderId + ' | Sawaikar\'s Cashew Store',
+    subject: 'Order Confirmed! ' + order.orderId + ' - Sawaikar\'s Cashew Store',
     text: plainTextEmail,
     html: htmlEmail
   };
