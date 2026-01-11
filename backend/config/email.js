@@ -120,9 +120,6 @@ const generateAddressHtml = (shippingAddress) => {
 const sendOrderConfirmationEmail = async (order) => {
   console.log('📧 sendOrderConfirmationEmail called for:', order.userEmail);
   
-  // Check if Resend API is available (preferred for production/Render)
-  const useResendAPI = !!process.env.RESEND_API_KEY;
-  
   // Calculate values
   const userName = order.userName || 'Valued Customer';
   const orderDate = new Date(order.createdAt).toLocaleDateString('en-IN', { 
