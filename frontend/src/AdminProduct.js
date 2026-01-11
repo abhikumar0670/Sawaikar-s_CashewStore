@@ -6,6 +6,9 @@ import { useUser, useClerk } from "@clerk/clerk-react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiPackage, FiShoppingCart, FiUsers, FiGrid, FiPlus, FiSearch, FiEdit2, FiTrash2, FiX, FiUpload, FiStar, FiTruck, FiCheck, FiHome, FiDollarSign, FiTrendingUp, FiCalendar, FiMail, FiEye, FiLogOut, FiBell, FiMenu, FiExternalLink, FiChevronDown, FiChevronRight, FiUser, FiShield, FiSettings, FiActivity, FiTag, FiGift, FiPercent, FiAlertTriangle, FiDownload } from "react-icons/fi";
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
+
 // Admin email - change this to your admin email
 const ADMIN_EMAIL = "abhikumar0670@gmail.com";
 
@@ -196,7 +199,7 @@ const AdminProductContent = () => {
       hasFetched.current = true;
       
       // Fetch products
-      axios.get("http://localhost:5000/api/products")
+      axios.get("${API_URL}/products")
         .then(response => {
           setProducts(response.data);
           setFilteredProducts(response.data);
@@ -207,7 +210,7 @@ const AdminProductContent = () => {
         });
 
       // Fetch orders
-      axios.get("http://localhost:5000/api/orders")
+      axios.get("${API_URL}/orders")
         .then(response => {
           // Handle both array and object response formats
           const ordersData = Array.isArray(response.data) ? response.data : (response.data.orders || []);
@@ -219,7 +222,7 @@ const AdminProductContent = () => {
         });
 
       // Fetch customers
-      axios.get("http://localhost:5000/api/users")
+      axios.get("${API_URL}/users")
         .then(response => {
           // API returns { success: true, users: [...] }
           const usersData = Array.isArray(response.data) ? response.data : (response.data.users || []);
@@ -231,7 +234,7 @@ const AdminProductContent = () => {
         });
 
       // Fetch coupons
-      axios.get("http://localhost:5000/api/coupons")
+      axios.get("${API_URL}/coupons")
         .then(response => {
           setCoupons(response.data);
         })
@@ -422,7 +425,7 @@ const AdminProductContent = () => {
   // Refresh products (for after add/edit/delete)
   const refreshProducts = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/products");
+      const response = await axios.get("${API_URL}/products");
       setProducts(response.data);
       setFilteredProducts(response.data);
     } catch (error) {
@@ -433,7 +436,7 @@ const AdminProductContent = () => {
   // Refresh orders
   const refreshOrders = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/orders");
+      const response = await axios.get("${API_URL}/orders");
       setOrders(response.data.orders || response.data || []);
     } catch (error) {
       console.error("Error refreshing orders:", error);
@@ -444,7 +447,7 @@ const AdminProductContent = () => {
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const userEmail = user?.primaryEmailAddress?.emailAddress;
-      await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, {
+      await axios.put(`${API_URL}/orders/${orderId}/status`, {
         orderStatus: newStatus,
         userEmail: userEmail
       });
@@ -595,7 +598,7 @@ const AdminProductContent = () => {
         console.log('📤 Updating product:', updateData);
         
         const response = await axios.put(
-          `http://localhost:5000/api/products/${editingProduct.id}`,
+          `${API_URL}/products/${editingProduct.id}`,
           updateData
         );
         
@@ -613,7 +616,7 @@ const AdminProductContent = () => {
         console.log('📤 Sending product data:', productData);
         
         const response = await axios.post(
-          "http://localhost:5000/api/products/add",
+          "${API_URL}/products/add",
           productData
         );
         
@@ -698,7 +701,7 @@ const AdminProductContent = () => {
     const { productId, productName } = deleteModal;
     
     try {
-      await axios.delete(`http://localhost:5000/api/products/${productId}?userEmail=${encodeURIComponent(userEmailState)}`);
+      await axios.delete(`${API_URL}/products/${productId}?userEmail=${encodeURIComponent(userEmailState)}`);
       
       // Close modal
       closeDeleteModal();
@@ -901,7 +904,7 @@ const AdminProductContent = () => {
       const product = products.find(p => p.id === productId);
       if (!product) return;
       
-      await axios.put(`http://localhost:5000/api/products/${productId}`, {
+      await axios.put(`${API_URL}/products/${productId}`, {
         ...product,
         stock: parseInt(newStock)
       });
@@ -978,15 +981,15 @@ const AdminProductContent = () => {
       };
       
       if (editingCoupon) {
-        await axios.put(`http://localhost:5000/api/coupons/${editingCoupon._id}`, couponData);
+        await axios.put(`${API_URL}/coupons/${editingCoupon._id}`, couponData);
         toast.success("Coupon updated successfully! 🎉");
       } else {
-        await axios.post('http://localhost:5000/api/coupons', couponData);
+        await axios.post('${API_URL}/coupons', couponData);
         toast.success("Coupon created successfully! 🎉");
       }
       
       // Refresh coupons
-      const response = await axios.get("http://localhost:5000/api/coupons");
+      const response = await axios.get("${API_URL}/coupons");
       setCoupons(response.data);
       
       setShowCouponModal(false);
@@ -1005,11 +1008,11 @@ const AdminProductContent = () => {
     if (!window.confirm("Are you sure you want to delete this coupon?")) return;
     
     try {
-      await axios.delete(`http://localhost:5000/api/coupons/${couponId}`);
+      await axios.delete(`${API_URL}/coupons/${couponId}`);
       toast.success("Coupon deleted successfully!");
       
       // Refresh coupons
-      const response = await axios.get("http://localhost:5000/api/coupons");
+      const response = await axios.get("${API_URL}/coupons");
       setCoupons(response.data);
     } catch (error) {
       console.error("Error deleting coupon:", error);
@@ -1020,11 +1023,11 @@ const AdminProductContent = () => {
   // Toggle coupon active status
   const handleToggleCoupon = async (couponId) => {
     try {
-      await axios.patch(`http://localhost:5000/api/coupons/${couponId}/toggle`);
+      await axios.patch(`${API_URL}/coupons/${couponId}/toggle`);
       toast.success("Coupon status updated!");
       
       // Refresh coupons
-      const response = await axios.get("http://localhost:5000/api/coupons");
+      const response = await axios.get("${API_URL}/coupons");
       setCoupons(response.data);
     } catch (error) {
       console.error("Error toggling coupon:", error);

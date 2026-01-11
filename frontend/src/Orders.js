@@ -10,6 +10,9 @@ import placeholderImg from './assets/placeholderImg';
 import OrderTracking from './components/OrderTracking';
 import { useCartContext } from './context/cart_context';
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const OrdersContainer = styled.div`
   margin: 40px auto;
   max-width: 900px;
@@ -150,7 +153,7 @@ const Orders = () => {
           return;
         }
 
-        const response = await axios.get(`http://localhost:5000/api/orders?email=${userEmail}`);
+        const response = await axios.get(`${API_URL}/orders?email=${userEmail}`);
         const fetchedOrders = response.data || [];
         
         // Sort by most recent first
@@ -170,7 +173,7 @@ const Orders = () => {
   // Cancel order handler
   const handleCancel = async (orderId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/orders/${orderId}`);
+      await axios.delete(`${API_URL}/orders/${orderId}`);
       setOrders(orders.map(order =>
         order.orderId === orderId ? { ...order, orderStatus: 'cancelled' } : order
       ));
@@ -184,7 +187,7 @@ const Orders = () => {
   // Return order handler
   const handleReturn = async (orderId) => {
     try {
-      await axios.put(`http://localhost:5000/api/orders/${orderId}`, {
+      await axios.put(`${API_URL}/orders/${orderId}`, {
         orderStatus: 'return_initiated'
       });
       setOrders(orders.map(order =>
@@ -206,7 +209,7 @@ const Orders = () => {
   const handleReorder = async (orderId) => {
     try {
       setReordering(orderId);
-      const response = await axios.post(`http://localhost:5000/api/orders/${orderId}/reorder`);
+      const response = await axios.post(`${API_URL}/orders/${orderId}/reorder`);
       const { reorderData } = response.data;
 
       if (reorderData.unavailableItems && reorderData.unavailableItems.length > 0) {

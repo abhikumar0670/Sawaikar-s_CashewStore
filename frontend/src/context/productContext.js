@@ -5,8 +5,9 @@ import reducer from "../Reducer/productReducer";
 
 const AppContext = createContext();
 
-// Backend API endpoint
-const API = "http://localhost:5000/api/products";
+// Backend API endpoint - uses environment variable for production
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API = `${API_BASE}/products`;
 
 const initialState = {
   isLoading: false,
@@ -27,6 +28,8 @@ const AppProvider = ({ children }) => {
       const res = await axios.get(url);
       const products = res.data;
       
+      console.log('Products fetched from backend:', products.length);
+      
       if (!Array.isArray(products)) {
         console.error('API did not return an array:', products);
         dispatch({ type: "API_ERROR" });
@@ -43,12 +46,14 @@ const AppProvider = ({ children }) => {
   };
 
   // Fetch a single product by ID from the backend
-  // Fetches a single product by ID from the backend API
   const getSingleProduct = async (productId) => {
+    console.log('getSingleProduct called with productId:', productId);
     dispatch({ type: "SET_SINGLE_LOADING" });
     try {
       const res = await axios.get(`${API}/${productId}`);
       const singleProduct = res.data;
+      
+      console.log('Single product fetched:', singleProduct);
       
       if (singleProduct) {
         dispatch({ type: "SET_SINGLE_PRODUCT", payload: singleProduct });

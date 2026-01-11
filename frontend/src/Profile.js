@@ -6,6 +6,9 @@ import { toast } from 'react-toastify';
 import PageNavigation from './components/PageNavigation';
 import { API_ENDPOINTS } from './config/api';
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const Profile = () => {
   const { user, isLoaded } = useUser();
   const { openUserProfile } = useClerk();

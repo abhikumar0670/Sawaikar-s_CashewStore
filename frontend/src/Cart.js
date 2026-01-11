@@ -10,6 +10,24 @@ import { useAuth } from "./context/auth_context";
 import emptyCartGif from "./assets/cartGif.gif";
 import { FiX, FiCreditCard, FiTag, FiGift, FiCheck } from "react-icons/fi";
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// const Cart = () => {
+//   const { cart, clearCart, total_price, shipping_fee } = useCartContext();
+//   // console.log("🚀 ~ file: Cart.js ~ line 6 ~ Cart ~ cart", cart);
+
+//   const { isAuthenticated, user } = useAuth0();
+
+//   if (cart.length === 0) {
+//     return (
+//       <EmptyDiv>
+//         <h3>No Cart in Item </h3>
+//       </EmptyDiv>
+//     );
+//   }
+
+
 const Cart = () => {
   const { cart, clearCart, total_price, shipping_fee } = useCartContext();
   const { isAuthenticated, user } = useAuth();
@@ -35,13 +53,13 @@ const Cart = () => {
       setAppliedCouponCode(code);
     }
     
-    // Fetch available coupons from backend
-    axios.get('http://localhost:5000/api/coupons')
+    // Fetch available coupons
+    axios.get(`${API_URL}/coupons`)
       .then(response => {
         const activeCoupons = response.data.filter(c => c.isActive && new Date(c.expiryDate) > new Date());
         setAvailableCoupons(activeCoupons.slice(0, 3)); // Show max 3 coupons
       })
-      .catch(() => { /* Coupon fetch failed silently */ });
+      .catch(err => console.log('Could not fetch coupons'));
   }, []);
 
   // Scroll lock effect
@@ -76,7 +94,7 @@ const Cart = () => {
       // Convert subtotal from paise to rupees for API
       const orderAmountRupees = subtotal / 100;
       
-      const response = await axios.post('http://localhost:5000/api/coupons/validate', {
+      const response = await axios.post(`${API_URL}/coupons/validate`, {
         code: code.toUpperCase(),
         userEmail: user?.email,
         orderAmount: orderAmountRupees

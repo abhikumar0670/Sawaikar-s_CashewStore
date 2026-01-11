@@ -29,6 +29,9 @@ import GoToTop from "./components/GoToTop";
 import TawkToChat from "./components/TawkToChat";
 import "./styles/WidgetPositioning.css";
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 // User sync component - syncs Clerk user to MongoDB (only once per session)
 const UserSync = () => {
   const { isSignedIn, user, isLoaded } = useUser();
@@ -39,7 +42,7 @@ const UserSync = () => {
       if (isLoaded && isSignedIn && user && !hasSynced.current) {
         hasSynced.current = true;
         try {
-          await axios.post('http://localhost:5000/api/users/sync', {
+          await axios.post(`${API_URL}/users/sync`, {
             clerkId: user.id,
             name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
             email: user.primaryEmailAddress?.emailAddress || ''

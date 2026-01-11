@@ -9,6 +9,9 @@ import { useUser } from "@clerk/clerk-react";
 import FormatPrice from "./Helpers/FormatPrice";
 import { API_ENDPOINTS } from "./config/api";
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const Payment = () => {
   const { user, isSignedIn } = useUser();
   const navigate = useNavigate();
@@ -270,7 +273,7 @@ const Payment = () => {
       // Step 1: Create Razorpay order on backend
       console.log('🔄 Creating Razorpay order for amount:', finalTotalRupees);
       
-      const orderResponse = await axios.post('http://localhost:5000/api/payment/create-order', {
+      const orderResponse = await axios.post('${API_URL}/payment/create-order', {
         amount: finalTotalRupees
       });
 
@@ -354,7 +357,7 @@ const Payment = () => {
             console.log('📤 Sending order data to backend:', orderData);
 
             // Verify payment and save order on backend (CRITICAL STEP)
-            const verifyResponse = await axios.post('http://localhost:5000/api/payment/verify-payment', {
+            const verifyResponse = await axios.post('${API_URL}/payment/verify-payment', {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
@@ -369,7 +372,7 @@ const Payment = () => {
               // Mark coupon as used if one was applied
               if (couponApplied && couponCode) {
                 try {
-                  await axios.post('http://localhost:5000/api/coupons/apply', {
+                  await axios.post('${API_URL}/coupons/apply', {
                     code: couponCode,
                     userEmail: getUserEmail(),
                     orderAmount: finalTotalPaise / 100 // Send in rupees

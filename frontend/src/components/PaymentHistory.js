@@ -4,6 +4,9 @@ import axios from 'axios';
 import { FaCreditCard, FaUniversity, FaWallet, FaMobileAlt } from 'react-icons/fa';
 import { SiPhonepe, SiPaytm, SiGooglepay } from 'react-icons/si';
 
+// API Base URL for production
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 // Helper to generate random barcode string
 function generateBarcode() {
   return Math.floor(100000000 + Math.random() * 900000000).toString();
@@ -100,7 +103,7 @@ const PaymentHistory = () => {
           return;
         }
 
-        const response = await axios.get(`http://localhost:5000/api/orders?email=${userEmail}`);
+        const response = await axios.get(`${API_URL}/orders?email=${userEmail}`);
         const orders = response.data || [];
         
         // Transform orders to transaction format
