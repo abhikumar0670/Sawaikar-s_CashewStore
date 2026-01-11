@@ -62,12 +62,23 @@ const generateAddressHtml = (shippingAddress) => {
 
 // Send order confirmation email
 const sendOrderConfirmationEmail = async (order) => {
+  console.log('📧 sendOrderConfirmationEmail called for:', order.userEmail);
+  
   const transporter = createTransporter();
   
   // Check if transporter is available
   if (!transporter) {
     console.warn('⚠️ Email transporter not available. Skipping email to: ' + order.userEmail);
     return { success: false, error: 'Email service not configured' };
+  }
+  
+  // Verify transporter connection
+  try {
+    await transporter.verify();
+    console.log('✅ SMTP connection verified successfully');
+  } catch (verifyError) {
+    console.error('❌ SMTP verification failed:', verifyError.message);
+    return { success: false, error: 'SMTP connection failed: ' + verifyError.message };
   }
   
   // Calculate values

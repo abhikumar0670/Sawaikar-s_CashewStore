@@ -277,10 +277,20 @@ router.post('/verify-payment', async (req, res) => {
           createdAt: newOrder.createdAt
         };
         
+        console.log('📧 Attempting to send email to:', userEmail);
+        console.log('📧 Order ID:', newOrder.orderId);
+        
         const emailResult = await sendOrderConfirmationEmail(orderForEmail);
-        console.log('📧 Email sent:', emailResult.success ? 'Yes' : 'No');
+        console.log('📧 Email result:', emailResult);
+        
+        if (emailResult.success) {
+          console.log('✅ Email sent successfully to:', userEmail);
+        } else {
+          console.error('❌ Email failed:', emailResult.error);
+        }
       } catch (emailError) {
         console.error('❌ Email sending failed (async):', emailError.message);
+        console.error('❌ Full error:', emailError);
       }
     });
 
