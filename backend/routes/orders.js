@@ -8,7 +8,8 @@ const {
   sendOrderProcessingEmail,
   sendOrderShippedEmail,
   sendOutForDeliveryEmail,
-  sendOrderDeliveredEmail
+  sendOrderDeliveredEmail,
+  sendOrderCancelledEmail
 } = require('../config/email');
 const { isAdmin } = require('../middleware/auth');
 
@@ -237,6 +238,8 @@ router.put('/:id/status', isAdmin, async (req, res) => {
       sendOutForDeliveryEmail(order).catch(err => console.error('Email error:', err));
     } else if (orderStatus === 'delivered') {
       sendOrderDeliveredEmail(order).catch(err => console.error('Email error:', err));
+    } else if (orderStatus === 'cancelled') {
+      sendOrderCancelledEmail(order).catch(err => console.error('Email error:', err));
     }
     
     res.json({ success: true, order });
@@ -299,6 +302,8 @@ router.put('/:orderId', isAdmin, async (req, res) => {
       sendOutForDeliveryEmail(order).catch(err => console.error('Email error:', err));
     } else if (orderStatus === 'delivered') {
       sendOrderDeliveredEmail(order).catch(err => console.error('Email error:', err));
+    } else if (orderStatus === 'cancelled') {
+      sendOrderCancelledEmail(order).catch(err => console.error('Email error:', err));
     }
     
     res.json(order);
@@ -329,6 +334,9 @@ router.delete('/:orderId', async (req, res) => {
     order.orderStatus = 'cancelled';
     order.addStatusUpdate('cancelled', 'Order cancelled by customer', '', 'Customer');
     await order.save();
+    
+    // Send cancellation email
+    sendOrderCancelledEmail(order).catch(err => console.error('Cancellation email error:', err));
     
     console.log(`🗑️ Order cancelled: ${order.orderId}`);
     res.json({ message: 'Order cancelled successfully', order });

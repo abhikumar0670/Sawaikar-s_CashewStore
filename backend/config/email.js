@@ -789,6 +789,120 @@ const sendOrderDeliveredEmail = async (order) => {
   return result;
 };
 
+// Send order cancelled email
+const sendOrderCancelledEmail = async (order) => {
+  console.log('Sending order cancelled email to:', order.userEmail);
+  
+  const userName = order.userName || 'Valued Customer';
+  const currentYear = new Date().getFullYear();
+  const fromEmail = '"Sawaikar\'s Cashew Store" <' + (process.env.EMAIL_USER || 'sawaikarcashewstore1980@gmail.com') + '>';
+  
+  // Calculate total
+  const total = formatPrice(order.totalAmount);
+  
+  const plainTextEmail = 'Hi ' + userName + ',\n\n' +
+    'Your order has been cancelled.\n\n' +
+    'ORDER DETAILS\n' +
+    '-------------------\n' +
+    'Order ID: ' + order.orderId + '\n' +
+    'Total Amount: Rs.' + total + '\n\n' +
+    'If you paid for this order, your refund will be processed within 5-7 business days.\n\n' +
+    'If you have any questions, please contact us.\n\n' +
+    'Thank you for choosing Sawaikar\'s Cashew Store!';
+
+  const htmlEmail = '<!DOCTYPE html>' +
+    '<html lang="en">' +
+    '<head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+    '</head>' +
+    '<body style="margin: 0; padding: 0; background-color: #FEF2F2; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Arial, sans-serif;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #FEF2F2;">' +
+    '<tr><td align="center" style="padding: 20px 10px;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);">' +
+    
+    '<!-- Header Banner - Red for Cancelled -->' +
+    '<tr>' +
+    '<td style="background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); padding: 35px 30px; text-align: center;">' +
+    '<h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 800;">Order Cancelled</h1>' +
+    '<p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Sawaikar\'s Cashew Store</p>' +
+    '</td>' +
+    '</tr>' +
+    
+    '<!-- Main Content -->' +
+    '<tr>' +
+    '<td style="padding: 35px 30px;">' +
+    '<p style="margin: 0 0 8px 0; color: #6B7280; font-size: 15px;">Hi <strong style="color: #DC2626;">' + userName + '</strong>,</p>' +
+    '<h2 style="margin: 0 0 20px 0; color: #1F2937; font-size: 22px; font-weight: 700;">Your order has been cancelled</h2>' +
+    
+    '<!-- Order ID Box -->' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #FEE2E2; border-radius: 12px; border: 2px solid #DC2626; margin-bottom: 25px;">' +
+    '<tr><td style="padding: 20px;">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">' +
+    '<tr>' +
+    '<td>' +
+    '<p style="margin: 0 0 5px 0; color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase;">Order ID</p>' +
+    '<p style="margin: 0; color: #DC2626; font-size: 18px; font-weight: 800;">' + order.orderId + '</p>' +
+    '</td>' +
+    '<td style="text-align: right;">' +
+    '<p style="margin: 0 0 5px 0; color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase;">Total Amount</p>' +
+    '<p style="margin: 0; color: #DC2626; font-size: 18px; font-weight: 800;">Rs.' + total + '</p>' +
+    '</td>' +
+    '</tr>' +
+    '</table>' +
+    '</td></tr>' +
+    '</table>' +
+    
+    '<!-- Items Cancelled -->' +
+    '<h3 style="margin: 0 0 15px 0; color: #DC2626; font-size: 16px; font-weight: 700;">Items Cancelled</h3>' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #FFFFFF; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1); margin-bottom: 25px;">' +
+    '<thead>' +
+    '<tr style="background: #DC2626;">' +
+    '<th style="padding: 14px 12px; text-align: left; color: #FFFFFF; font-size: 13px; font-weight: 600;">Item</th>' +
+    '<th style="padding: 14px 12px; text-align: center; color: #FFFFFF; font-size: 13px; font-weight: 600;">Qty</th>' +
+    '<th style="padding: 14px 12px; text-align: right; color: #FFFFFF; font-size: 13px; font-weight: 600;">Price</th>' +
+    '</tr>' +
+    '</thead>' +
+    '<tbody>' +
+    order.items.map(item => '<tr><td style="padding: 14px 12px; border-bottom: 1px solid #FEE2E2; color: #374151; font-size: 14px;">' + item.name + '</td><td style="padding: 14px 12px; border-bottom: 1px solid #FEE2E2; text-align: center; color: #374151; font-size: 14px;">' + item.quantity + '</td><td style="padding: 14px 12px; border-bottom: 1px solid #FEE2E2; text-align: right; color: #374151; font-size: 14px; font-weight: 600;">Rs.' + formatPrice(item.price * item.quantity) + '</td></tr>').join('') +
+    '</tbody>' +
+    '</table>' +
+    
+    '<!-- Refund Notice -->' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #FEF3C7; border-radius: 10px; padding: 20px; margin-bottom: 20px;">' +
+    '<tr><td style="padding: 15px;">' +
+    '<p style="margin: 0; color: #92400E; font-size: 14px; line-height: 1.6;"><strong>Refund Information:</strong><br>If you paid for this order, your refund will be processed within 5-7 business days to your original payment method.</p>' +
+    '</td></tr>' +
+    '</table>' +
+    
+    '<p style="margin: 0; color: #6B7280; font-size: 14px; line-height: 1.6;">If you have any questions or concerns, please don\'t hesitate to contact us.</p>' +
+    '</td>' +
+    '</tr>' +
+    
+    '<!-- Footer -->' +
+    '<tr>' +
+    '<td style="background: #FEE2E2; padding: 25px 30px; text-align: center;">' +
+    '<p style="margin: 0 0 10px 0; color: #991B1B; font-size: 13px;">Need help? Contact us:</p>' +
+    '<p style="margin: 0; color: #DC2626; font-size: 14px; font-weight: 600;">support@sawaikarcashew.com | +91 98765 43210</p>' +
+    '<p style="margin: 15px 0 0 0; color: #991B1B; font-size: 11px;">' + currentYear + ' Sawaikar\'s Cashew Store. All rights reserved.</p>' +
+    '</td>' +
+    '</tr>' +
+    '</table></td></tr></table></body></html>';
+
+  const result = await sendEmail({
+    from: fromEmail,
+    to: order.userEmail,
+    subject: 'Order Cancelled - ' + order.orderId,
+    text: plainTextEmail,
+    html: htmlEmail
+  });
+  
+  if (result.success) {
+    console.log('Cancelled email sent to ' + order.userEmail);
+  }
+  return result;
+};
+
 // Send low stock alert email (to admin)
 const sendLowStockAlertEmail = async (products) => {
   const currentYear = new Date().getFullYear();
@@ -848,5 +962,6 @@ module.exports = {
   sendOrderShippedEmail,
   sendOutForDeliveryEmail,
   sendOrderDeliveredEmail,
+  sendOrderCancelledEmail,
   sendLowStockAlertEmail
 };
